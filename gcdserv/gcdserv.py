@@ -46,4 +46,5 @@ if __name__ == '__main__':
     exit(1)
   port = int(sys.argv[1])
   with socketserver.TCPServer(('', port), GroupCoordinatorDaemon) as server:
+    print('gcdserv is listening...')
     server.serve_forever()
