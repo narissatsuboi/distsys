@@ -28,15 +28,20 @@ class GroupCoordinatorDaemon(socketserver.BaseRequestHandler):
     """
     raw = self.request.recv(BUF_SZ) # self.request is the TCP socket connected to the client
     print(self.client_address)
-    try:
+    try:  # deserialize datastream
+      print('gcdserver >>> unpickling client message...')
       message = pickle.loads(raw)
-    except (pickle.PickleError, KeyError, EOFError):
+    except (pickle.PickleError, KeyError, EOFError): # msg wasnt picked
+      print('gcdserver >>> cli msg was not pickled...')
       response = bytes('Expected a pickled message, got ' + str(raw)[:100] + '\n', 'utf-8')
-    else:
-      if message != 'JOIN':
+    else:  # msg was picked but not 'JOIN'
+      if message != 'JOIN':  # response is serialized error response
+        print('gcdserver >>> cli msg was not JOIN')
         response = pickle.dumps('Unexpected message: ' + str(message))
-      else:
+      else:  # success, sends serialized message back
+        print('gcdserver >>> In successful join response')
         response = pickle.dumps(self.JOIN_RESPONSE)
+    print('gcdserver >>> sending reponse back to cli')
     self.request.sendall(response)
 
 

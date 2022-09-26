@@ -4,6 +4,7 @@ This is free and unencumbered software released into the public domain.
 :Authors: Narissa Tsuboi
 :Version: 1
 """
+import pickle
 import socket
 import sys
 
@@ -19,6 +20,7 @@ if __name__ == '__main__':
     port = int(sys.argv[2])
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.connect((host, port))
-        s.sendall(b'JOIN')
-        data = s.recv(1024)
+        message = pickle.dumps('JOIN')
+        s.sendall(message)
+        data = s.recv(1024)  # response back from gcd
     print('Received', repr(data))
