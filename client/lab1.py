@@ -38,8 +38,9 @@ def get_neighbor_response(host, port):
     :return: connection message
     """
 
-    # establish client side socket for GCD
+    # establish client side socket
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(1.5)
         try:
             s.connect((host, port))
         except socket_error as serr:
@@ -48,10 +49,10 @@ def get_neighbor_response(host, port):
         s.sendall(pickle.dumps(NBR_MSG))
         try:
             data = s.recv(1024)
-        except socket.timeout(15) as e:
+        except socket.timeout(1.5) as terr:
+            print('no response: {} %s' % terr)
             return ""
 
-        # handle neighbor's response
         try:
             response = pickle.loads(data)
         except(pickle.PickleError, KeyError, EOFError):
@@ -85,7 +86,6 @@ if __name__ == '__main__':
     for pair in gcd_response:
         host, port = pair['host'], pair['port']
         print('HELLO to ' + repr(pair))
-        #print(host, " ", port)
         neighbor_response = get_neighbor_response(host, port)
         if neighbor_response == "":
             continue
