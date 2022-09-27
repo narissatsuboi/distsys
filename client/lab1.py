@@ -46,8 +46,10 @@ def get_neighbor_response(host, port):
             print('failed to connect: {} %s' % serr)
             return ""
         s.sendall(pickle.dumps(NBR_MSG))
-        data = s.recv(1024)
-        #s.settimeout(15) TODO
+        try:
+            data = s.recv(1024)
+        except socket.timeout(15) as e:
+            return ""
 
         # handle neighbor's response
         try:
