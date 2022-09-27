@@ -11,25 +11,40 @@ import errno
 import sys
 
 GCD_MSG = 'JOIN'  # only msg GCD will accept
-NBR_MSG = 'HELLO'  # only msg neighbor clients will accept
+NBR_MSG = 'HELLO' # only msg neighbor clients will accept
+BUF_SZ = 1024     # msg buffer size in bs
+TIMEOUT = 1.5     # socket timeout duration
 
 
 def get_GCD_response(host, port):
-    # establish client side socket for GCD
+    # create socket
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.connect((HOST, GCD_PORT))
+        # connect socket
+        try:
+            s.connect((HOST, GCD_PORT))
+        except socket_error as serr:
+            print('failed to connect to server: %s' % serr)
+            sys.exit(1)
         s.sendall(pickle.dumps(GCD_MSG))
-        data = s.recv(1024)
+
+        # receive data
+        try:
+            data = s.recv(BUF_SZ)
+        except socket_error as serr:
+            print('error receiving data: %s' % serr)
+            sys.exit(1)
 
         # handle server response
         try:
             gcd_response = pickle.loads(data)
         except(pickle.PickleError, KeyError, EOFError):
-            gcd_response = 'ERROR: ' + str(data)
+            gcd_response = 'error: ' + str(data)
         else:
             if 'Unexpected message' in gcd_response:
-                gcd_response = 'ERROR: GCD only accepts JOIN as msg'
+                gcd_response = 'error: unexpected message'
+
         return gcd_response
+
 
 def get_neighbor_response(host, port):
     """
@@ -40,7 +55,7 @@ def get_neighbor_response(host, port):
 
     # establish client side socket
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.settimeout(1.5)
+        s.settimeout(TIMEOUT)
         try:
             s.connect((host, port))
         except socket_error as serr:
@@ -48,8 +63,8 @@ def get_neighbor_response(host, port):
             return ""
         s.sendall(pickle.dumps(NBR_MSG))
         try:
-            data = s.recv(1024)
-        except socket.timeout(1.5) as terr:
+            data = s.recv(BUF_SZ)
+        except socket.timeout(TIMEOUT) as terr:
             print('no response: {} %s' % terr)
             return ""
 
