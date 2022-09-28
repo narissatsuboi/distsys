@@ -97,7 +97,7 @@ def get_neighbor_response(host, port):
             response = 'error: ' + str(data)
         else:
             if 'Unexpected message' in response:
-                response = 'ERROR: Neighbor only accepts HELLO as msg'
+                response = 'error: Neighbor only accepts HELLO as msg'
 
         return response
 
