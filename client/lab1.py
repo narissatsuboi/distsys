@@ -174,9 +174,6 @@ if __name__ == '__main__':
 
     # connect to group coordinator daemon
     gcd_response = client.send_message(HOST, GCD_PORT, GCD_MSG)
-    if not gcd_response:
-        print(gcd_response)
-        sys.exit(1)
 
     print(GCD_MSG + ' (' + str(HOST) + ', ' + str(GCD_PORT) + ')')
 
