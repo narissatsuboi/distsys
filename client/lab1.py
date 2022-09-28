@@ -15,91 +15,113 @@ from socket import error as socket_error
 import sys
 
 GCD_MSG = 'JOIN'  # only msg GCD will accept
-NBR_MSG = 'HELLO' # only msg neighbor clients will accept
-BUF_SZ = 1024     # msg buffer size in bs
-TIMEOUT = 1.5     # socket timeout duration
+NBR_MSG = 'HELLO'  # only msg neighbor clients will accept
+BUF_SZ = 1024  # msg buffer size in bs
+TIMEOUT = 1.5  # socket timeout duration
 
 
-def get_server_response(host, port):
-    """
-    Connects to test gcd running at the host and port inputted.
-    Unpickles msg rec'd. On valid msg sends pickled response of other
-    hosts and ports to the connected socket.
+class Client:
+    def __init__(self, gcd_msg='HELLO', nbr_msg='JOIN',
+                 buffer_size=1024):
+        self.gcd_msg = gcd_msg
+        self.nbr_msg = nbr_msg
+        self.buffer_size = buffer_size
 
-    :param host: IP/hostname
-    :param port: port number of GCD
-    :return:  message
-    """
+    @property
+    def buffer_size(self) -> int:
+        return self.buffer_size
 
-    # create socket
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        # connect socket
-        s.settimeout(TIMEOUT)
-        try:
-            s.connect((HOST, GCD_PORT))
-        except socket_error as serr:
-            print('failed to connect to server: %s' % serr)
-            sys.exit(1)
-        s.sendall(pickle.dumps(GCD_MSG))
+    @buffer_size.setter
+    def buffer_size(self, value):
+        self._buffer_size = value
 
-        # receive data
-        try:
-            data = s.recv(BUF_SZ)
-        except socket_error as serr:
-            print('error receiving data: %s' % serr)
-            sys.exit(1)
+    @property
+    def gcd_msg(self) -> str:
+        return self.gcd_msg
 
-        # handle server response
-        try:
-            gcd_response = pickle.loads(data)
-        except(pickle.PickleError, KeyError, EOFError):
-            gcd_response = 'error: ' + str(data)
-        else:
-            if 'Unexpected message' in gcd_response:
-                gcd_response = 'error: unexpected message'
+    @gcd_msg.setter
+    def gcd_msg(self, value):
+        self._gcd_msg = value
 
-        return gcd_response
+    def get_server_response(self, host, port):
+        """
+        Connects to test gcd running at the host and port inputted.
+        Unpickles msg rec'd. On valid msg sends pickled response of other
+        hosts and ports to the connected socket.
 
+        :param host: IP/hostname
+        :param port: port number of GCD
+        :return:  message
+        """
 
-def get_neighbor_response(host, port):
-    """
-    Given host and port, returns msg rec'd from host. Handles
-    connection, no response, invalid format, and invalid msg with
-    error msgs to console.
+        # create socket
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            # connect socket
+            s.settimeout(TIMEOUT)
+            try:
+                s.connect((HOST, GCD_PORT))
+            except socket_error as serr:
+                print('failed to connect to server: %s' % serr)
+                sys.exit(1)
+            s.sendall(pickle.dumps(GCD_MSG))
 
-    :param host: IP/hostname
-    :param port: port number
-    :return:  message
-    """
+            # receive data
+            try:
+                data = s.recv(BUF_SZ)
+            except socket_error as serr:
+                print('error receiving data: %s' % serr)
+                sys.exit(1)
 
-    # create socket
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        # connect socket
-        s.settimeout(TIMEOUT)
-        try:
-            s.connect((host, port))
-        except socket_error as serr:
-            print('failed to connect: {} %s' % serr)
-            return
-        s.sendall(pickle.dumps(NBR_MSG))
+            # handle server response
+            try:
+                gcd_response = pickle.loads(data)
+            except(pickle.PickleError, KeyError, EOFError):
+                gcd_response = 'error: ' + str(data)
+            else:
+                if 'Unexpected message' in gcd_response:
+                    gcd_response = 'error: unexpected message'
 
-        # receive data
-        try:
-            data = s.recv(BUF_SZ)
-        except socket.timeout(TIMEOUT) as terr:
-            print('no response: {} %s' % terr)
-            return
+            return gcd_response
 
-        # handle neighbor response
-        try:
-            response = pickle.loads(data)
-        except(pickle.PickleError, KeyError, EOFError):
-            response = 'error: ' + str(data)
-        else:
-            if 'Unexpected message' in response:
-                response = 'error: Neighbor only accepts HELLO as msg'
+    def get_neighbor_response(self, host, port):
+        """
+        Given host and port, returns msg rec'd from host. Handles
+        connection, no response, invalid format, and invalid msg with
+        error msgs to console.
 
-        return response
+        :param host: IP/hostname
+        :param port: port number
+        :return:  message
+        """
+
+        # create socket
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            # connect socket
+            s.settimeout(TIMEOUT)
+            try:
+                s.connect((host, port))
+            except socket_error as serr:
+                print('failed to connect: {} %s' % serr)
+                return
+            s.sendall(pickle.dumps(NBR_MSG))
+
+            # receive data
+            try:
+                data = s.recv(BUF_SZ)
+            except socket.timeout(TIMEOUT) as terr:
+                print('no response: {} %s' % terr)
+                return
+
+            # handle neighbor response
+            try:
+                response = pickle.loads(data)
+            except(pickle.PickleError, KeyError, EOFError):
+                response = 'error: ' + str(data)
+            else:
+                if 'Unexpected message' in response:
+                    response = 'ERROR: Neighbor only accepts HELLO as msg'
+
+            return response
 
 
 if __name__ == '__main__':
@@ -112,8 +134,11 @@ if __name__ == '__main__':
     HOST = sys.argv[1]
     GCD_PORT = int(sys.argv[2])  # 23600
 
+    # init client
+    client = Client()
+
     # connect to group coordinator daemon
-    gcd_response = get_server_response(HOST, GCD_PORT)
+    gcd_response = client.get_server_response(HOST, GCD_PORT)
     print(GCD_MSG + ' (' + str(HOST) + ', ' + str(GCD_PORT) + ')')
 
     # handle string response (error)
@@ -125,7 +150,7 @@ if __name__ == '__main__':
     for pair in gcd_response:
         host, port = pair['host'], pair['port']
         print('HELLO to ' + repr(pair))
-        neighbor_response = get_neighbor_response(host, port)
+        neighbor_response = client.get_neighbor_response(host, port)
 
         # skip to next neighbor if no response
         if neighbor_response is None:
