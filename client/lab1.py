@@ -146,14 +146,14 @@ class Client:
 
             # receive data
             try:
-                data = s.recv(self.buffer_size)
+                pick_data = s.recv(self.buffer_size)
             except socket_error as serr:
                 print('failed to return response: {} %s' % serr)
                 return
 
             # handle neighbor response
             try:
-                unpick_data = pickle.loads(data)
+                unpick_data = pickle.loads(pick_data)
             except(pickle.PickleError, KeyError, EOFError):
                 unpick_data = 'error: ' + str(unpick_data)
 
@@ -179,11 +179,6 @@ if __name__ == '__main__':
         sys.exit(1)
 
     print(GCD_MSG + ' (' + str(HOST) + ', ' + str(GCD_PORT) + ')')
-
-    # handle string response (error)
-    if type(gcd_response) is not list:
-        print(gcd_response)
-        sys.exit(1)
 
     # print responses from neighbor nodes
     for pair in gcd_response:
