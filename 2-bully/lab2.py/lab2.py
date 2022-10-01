@@ -19,6 +19,11 @@ import datetime
 from datetime import datetime
 from datetime import timedelta
 
+# TODO confirm or justify this value
+CHECK_INTERVAL = 1.5  # ms to wait before checking for events in list serv
+
+# TODO figure out what this is and what the actual number is supposed to be
+PEER_DIGITS = 1
 
 BUF_SZ = 1024
 
@@ -74,14 +79,36 @@ class Lab2(object):
         self.selector = selectors.DefaultSelector()
         self.listener, self.listener_address = self.start_a_server()
 
+    @staticmethod
+    def start_a_server():
+        # set up listening server
+        listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        listener.bind(('localhost', 0))
+        listener.listen()
+        return listener, listener.getsockname()
+
+        # # set up the selectors (bag of sockets)
+        # selector = selectors.DefaultSelector()
+        # selector.register(server, selectors.EVENT_READ)
+        #
+        # # selector loop
+        # while True:
+        #     events = self.selector.select(CHECK_INTERVAL)
+        pass
+
+    def join_group(self):
+        pass
+
+    def send_message(self, peer):
+        pass
+
+
     def run(self):
         pass
 
     def accept_peer(self):
         pass
 
-    def send_message(self, peer):
-        pass
 
     def receive_message(self, peer):
         pass
@@ -125,13 +152,6 @@ class Lab2(object):
         pass
 
     @staticmethod
-    def start_a_server():
-        pass
-
-    def join_group(self):
-        pass
-
-    @staticmethod
     def pr_now():
         """ Printing helper for current timestamp """
         return datetime.now().strftime('%H:%M:%S.%f')
@@ -142,15 +162,15 @@ class Lab2(object):
             return 'self'
         return self.cpr_sock(sock)
 
-    # @staticmethod
-    # def cpr_sock(sock):
-    #     """ Static version of helper for printing given socket """
-    #     l_port = sock.getsockname()[1] % PEER_DIGITS
-    #     try:
-    #         r_port = sock.getpeername()[1] % PEER_DIGITS
-    #     except OSError:
-    #         r_port = '???'
-    #     return '{}->{} ({})'.format(l_port, r_port, id(sock))
+    @staticmethod
+    def cpr_sock(sock):
+        """ Static version of helper for printing given socket """
+        l_port = sock.getsockname()[1] % PEER_DIGITS
+        try:
+            r_port = sock.getpeername()[1] % PEER_DIGITS
+        except OSError:
+            r_port = '???'
+        return '{}->{} ({})'.format(l_port, r_port, id(sock))
 
     def pr_leader(self):
         """ Printing helper for current leader's name """
