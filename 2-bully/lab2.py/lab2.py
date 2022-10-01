@@ -25,6 +25,9 @@ CHECK_INTERVAL = 1.5  # ms to wait before checking for events in list serv
 # TODO figure out what this is and what the actual number is supposed to be
 PEER_DIGITS = 1
 
+# TODO justify
+ASSUME_FAILURE_TIMEOUT = 5
+
 BUF_SZ = 1024
 
 class State(Enum):
@@ -87,6 +90,7 @@ class Lab2(object):
         listener.listen()
         return listener, listener.getsockname()
 
+        # TODO where does this go? its not static so it can't go in start_a_server
         # # set up the selectors (bag of sockets)
         # selector = selectors.DefaultSelector()
         # selector.register(server, selectors.EVENT_READ)
@@ -100,7 +104,30 @@ class Lab2(object):
         pass
 
     def send_message(self, peer):
-        pass
+        """
+        Send the queued msg to the given peer (based on its current state
+
+        :param peer:
+        :return:
+        """
+        state = self.get_state(peer)
+        print('{}: sending {} [{}]'.format(self.pr_sock(peer), state.value,
+                                           self.pr_now()))
+        try:
+            # should be ready, but may be a failed connect instead
+            self.send(peer, state.value, self.members)
+        except ConnectionError as err:  # TODO better exception handling later
+            print('error sending exiting send_msg')
+            pass
+        except Exception as err:
+            print('error sending exiting send_msg')
+            pass
+
+        # check to see if we want to wait for response immediately
+        if state == State.SEND_ELECTION:
+            self.set_state(State.WAITING_FOR_OK, peer, switch_mode=True)
+        else:
+            self.set_quiescent(peer)
 
 
     def run(self):
@@ -122,8 +149,8 @@ class Lab2(object):
     def is_election_in_progress(self):
         pass
 
-    # def is_expired(self, peer=None, threshold=ASSUME_FAILURE_TIMEOUT):
-    #     pass
+    def is_expired(self, peer=None, threshold=ASSUME_FAILURE_TIMEOUT):
+        pass
 
     def set_leader(self, new_leader):
         pass
