@@ -11,12 +11,41 @@ https://docs.python.org/3/library/selectors.html
 """
 import selectors   # used to wait for I/O readiness notification on multiple file objects
 import socket
+from enum import Enum
 from socket import error as socket_error
 import pickle
 import sys
 import datetime
 from datetime import datetime
 from datetime import timedelta
+
+
+class State(Enum):
+    """
+    Enumeration of state a peer can have for the Lab2 class.
+    """
+    QUIESCENT = 'QUIESCENT'  # erase any memory of this peer
+
+    # outgoing msg is pending
+    SEND_ELECTION = 'ELECTION'
+    SEND_VICTORY = 'COORDINATOR'
+    SEND_OK = 'OK'
+
+    # incoming msg is pending
+
+    # when I've sent an ELECTION msg
+    WAITING_FOR_OK = 'WAIT_OK'
+
+    # only applies to myself
+    WAITING_FOR_VICTOR = 'WHO IS THE WINNER?'
+
+    # when I've done an accept on their connect to my server
+    WAITING_FOR_ANY_MESSAGE = 'WAITING'
+
+    def is_incoming(self):
+        """ Categorization helper. """
+        return self not in (State.SEND_ELECTION, State.SEND_VICTORY, State.SEND_OK)
+
 
 class Lab2(object):
     """
