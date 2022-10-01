@@ -16,9 +16,13 @@ SUID = 123456
 class TestLab2(unittest.TestCase):
 
 
-    def setUp(self) -> None:
+    def setUp(self):
         print('setUp')
         self.node = Lab2(GCD_ADDRESS, NEXT_BIRTHDAY, SUID)
+
+    def tearDown(self):
+        print('tearDown')
+        self.node.listener.close()
 
     # test constructor
     print('### TEST __INIT__')
@@ -48,14 +52,19 @@ class TestLab2(unittest.TestCase):
         print('test_selector_is_not_None')
         self.assertIsNotNone(self.node.selector)
 
-    def test_listener_is_not_None(self):
-        print('test_listener_is_not_None')
+    def test_listener_is_localhost(self):
+        print('test_listener_is_localhost')
         self.assertIsNotNone(self.node.listener)
+        res = self.node.listener.getsockname()[0]
+        self.assertEqual(res, '127.0.0.1')
 
     def test_listener_address_is_not_None(self):
         print('test_listener_address_is_not_None')
-        self.assertIsNotNone(self.node.listener_address)
+        self.assertIsNotNone(self.node.listener)
 
+
+    # print socket
+    #print(self.node.cpr_sock(self.node.listener))
 
 if __name__ == '__main__':
     unittest.main()
