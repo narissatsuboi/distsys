@@ -20,6 +20,8 @@ from datetime import datetime
 from datetime import timedelta
 
 
+BUF_SZ = 1024
+
 class State(Enum):
     """
     Enumeration of state a peer can have for the Lab2 class.
@@ -69,9 +71,91 @@ class Lab2(object):
         self.members = {}
         self.states = {}
         self.bully = {}  # None means election is pending, otherwise pid of bully
-        #self.selector = selectors.DefaultSelector()
-        #self.listener, self.listener_address = self.start_a_server()
+        self.selector = selectors.DefaultSelector()
+        self.listener, self.listener_address = self.start_a_server()
 
+    def run(self):
+        pass
+
+    def accept_peer(self):
+        pass
+
+    def send_message(self, peer):
+        pass
+
+    def receive_message(self, peer):
+        pass
+
+    def check_timeouts(self):
+        pass
+
+    def get_connection(self, member):
+        pass
+
+    def is_election_in_progress(self):
+        pass
+
+    # def is_expired(self, peer=None, threshold=ASSUME_FAILURE_TIMEOUT):
+    #     pass
+
+    def set_leader(self, new_leader):
+        pass
+
+    def get_state(self, peer=None, switch_mode=False):
+        pass
+
+    def set_state(self, state, peer=None, switch_mode=False):
+        pass
+
+    def set_quiescent(self, peer=None):
+        pass
+
+    def start_election(self, reason):
+        pass
+
+    def declare_victory(self, reason):
+        pass
+
+    def update_members(self, their_idea_of_membership):
+        pass
+
+    @classmethod
+    def send(cls, peer, message_name, message_date=None, wait_for_reply=False,
+             buffer_size=BUF_SZ):
+        pass
+
+    @staticmethod
+    def start_a_server():
+        pass
+
+    def join_group(self):
+        pass
+
+    @staticmethod
+    def pr_now():
+        """ Printing helper for current timestamp """
+        return datetime.now().strftime('%H:%M:%S.%f')
+
+    def pr_sock(self, sock):
+        """ Printing helper for given socket """
+        if sock is None or sock == self or sock == self.listener:
+            return 'self'
+        return self.cpr_sock(sock)
+
+    # @staticmethod
+    # def cpr_sock(sock):
+    #     """ Static version of helper for printing given socket """
+    #     l_port = sock.getsockname()[1] % PEER_DIGITS
+    #     try:
+    #         r_port = sock.getpeername()[1] % PEER_DIGITS
+    #     except OSError:
+    #         r_port = '???'
+    #     return '{}->{} ({})'.format(l_port, r_port, id(sock))
+
+    def pr_leader(self):
+        """ Printing helper for current leader's name """
+        return 'unknown' if self.bully is None else ('self' if self.bully == self.pid
+                                                     else self.bully)
 
 
 
