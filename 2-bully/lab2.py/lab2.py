@@ -129,13 +129,19 @@ class Lab2(object):
         else:
             self.set_quiescent(peer)
 
+        # create socket thru handle response
+
+    @classmethod
+    def send(cls, peer, message_name, message_date=None, wait_for_reply=False,
+             buffer_size=BUF_SZ):
+        pass
+
 
     def run(self):
         pass
 
     def accept_peer(self):
         pass
-
 
     def receive_message(self, peer):
         pass
@@ -156,7 +162,19 @@ class Lab2(object):
         pass
 
     def get_state(self, peer=None, switch_mode=False):
-        pass
+        """
+        Look up current state in state table.
+
+        :param peer: socket connected to peer process (None means self)
+        :param switch_mode: if True, then state and timestamp are both returned
+        :return: either the state or (state, timestamp) depending on the detail (not
+        found gives(QUIESCENT, None))
+        """
+
+        if peer is None:
+            peer = self
+        status = self.states[peer] if peer in self.states else (State.QUIESCENT, None)
+        return status if switch_mode else status[0]
 
     def set_state(self, state, peer=None, switch_mode=False):
         pass
@@ -173,10 +191,6 @@ class Lab2(object):
     def update_members(self, their_idea_of_membership):
         pass
 
-    @classmethod
-    def send(cls, peer, message_name, message_date=None, wait_for_reply=False,
-             buffer_size=BUF_SZ):
-        pass
 
     @staticmethod
     def pr_now():
