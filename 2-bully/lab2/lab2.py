@@ -9,7 +9,7 @@ References
 https://docs.python.org/3/library/selectors.html
 
 """
-import selectors   # used to wait for I/O readiness notification on multiple file objects
+import selectors  # used to wait for I/O readiness notification on multiple file objects
 import socket
 from enum import Enum
 from socket import error as socket_error
@@ -30,8 +30,8 @@ ASSUME_FAILURE_TIMEOUT = 5
 
 BUF_SZ = 1024
 
-class State(Enum):
 
+class State(Enum):
     """
     Enumeration of state a peer can have for the Lab2 class.
     """
@@ -89,7 +89,7 @@ class Lab2(object):
         listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         listener.bind(('localhost', 0))
         listener.listen()
-        return listener, listener.getsockname()
+        return listener, listener.getsockname()  # getsockname format (host, port)
 
         # TODO where does this go? its not static so it can't go in start_a_server
         # # set up the selectors (bag of sockets)
@@ -100,9 +100,15 @@ class Lab2(object):
         # while True:
         #     events = self.selector.select(CHECK_INTERVAL)
 
-
     def join_group(self):
-        pass
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as gcd:
+            JOIN = ('JOIN', (self.pid, self.listener_address))
+
+            gcd.connect(self.gcd_address)  # create socket
+            gcd.sendall(pickle.dumps(JOIN))  # send pickled msg
+            self.members = pickle.loads(gcd.recv(BUF_SZ))  # unpickle get msg back
+            print(self.members)
+
 
     def send_message(self, peer):
         """
@@ -137,7 +143,6 @@ class Lab2(object):
     def send(cls, peer, message_name, message_data=None, wait_for_reply=False,
              buffer_size=BUF_SZ):
         pass
-
 
     def run(self):
         pass
@@ -197,7 +202,6 @@ class Lab2(object):
     def update_members(self, their_idea_of_membership):
         pass
 
-
     @staticmethod
     def pr_now():
         """ Printing helper for current timestamp """
@@ -225,13 +229,16 @@ class Lab2(object):
                                                      else self.bully)
 
 
-
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
     print('Bully')
     # handle invalid command line args count
-    if len(sys.argv) != 3:
-        print("Usage: python3 lab2.py (IP, port) 'YYYY-MM-DD' suid")
+    if len(sys.argv) != 5:
+        print("Usage: python3 lab2 (IP, port) 'YYYY-MM-DD' suid")
         exit(1)
 
-
+    HOST, GCD_PORT, NEXT_BDAY, SUID = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+    print(HOST, GCD_PORT, NEXT_BDAY, SUID)
+    my_peer = Lab2((HOST, GCD_PORT), NEXT_BDAY, SUID)
+    print('mypeer created')
+    my_peer.join_group()
