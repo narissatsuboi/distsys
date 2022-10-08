@@ -31,6 +31,7 @@ ASSUME_FAILURE_TIMEOUT = 5
 BUF_SZ = 1024
 
 class State(Enum):
+
     """
     Enumeration of state a peer can have for the Lab2 class.
     """
@@ -98,7 +99,7 @@ class Lab2(object):
         # # selector loop
         # while True:
         #     events = self.selector.select(CHECK_INTERVAL)
-        pass
+
 
     def join_group(self):
         pass
@@ -116,6 +117,7 @@ class Lab2(object):
         try:
             # should be ready, but may be a failed connect instead
             self.send(peer, state.value, self.members)
+
         except ConnectionError as err:  # TODO better exception handling later
             print('error sending exiting send_msg')
             pass
@@ -131,8 +133,8 @@ class Lab2(object):
 
         # create socket thru handle response
 
-    @classmethod
-    def send(cls, peer, message_name, message_date=None, wait_for_reply=False,
+    @classmethod  # uses the class to know which receive method to call
+    def send(cls, peer, message_name, message_data=None, wait_for_reply=False,
              buffer_size=BUF_SZ):
         pass
 
@@ -144,6 +146,10 @@ class Lab2(object):
         pass
 
     def receive_message(self, peer):
+        pass
+
+    @staticmethod
+    def receive(peer, buffer_siz=BUF_SZ):
         pass
 
     def check_timeouts(self):

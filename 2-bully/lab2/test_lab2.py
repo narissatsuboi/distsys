@@ -11,17 +11,18 @@ from lab2 import Lab2
 
 GCD_ADDRESS = ('127.0.0.1', '22')
 NEXT_BIRTHDAY = '2023-06-28'
+
 SUID = 123456
 
 class TestLab2(unittest.TestCase):
 
 
     def setUp(self):
-        print('setUp')
+        #print('setUp')
         self.node = Lab2(GCD_ADDRESS, NEXT_BIRTHDAY, SUID)
 
     def tearDown(self):
-        print('tearDown')
+        #print('tearDown')
         self.node.listener.close()
 
     # test constructor
@@ -33,7 +34,7 @@ class TestLab2(unittest.TestCase):
 
     def test_pid(self):
         print('test_pid')
-        res = (269, 123456)
+        res = (262, 123456)
         self.assertEqual(self.node.pid, res)
 
     def test_members_is_not_None(self):
