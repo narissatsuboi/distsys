@@ -87,28 +87,41 @@ class Lab2(object):
     def start_a_server():
         # set up listening server
         listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        listener.bind(('localhost', 0))
-        listener.listen()
+        listener.bind(('localhost', 0))  # use any free socket
+        listener.listen(100)  # allow backlog of 100
+        listener.setblocking(False)
         return listener, listener.getsockname()  # getsockname format (host, port)
 
-        # TODO where does this go? its not static so it can't go in start_a_server
-        # # set up the selectors (bag of sockets)
-        # selector = selectors.DefaultSelector()
-        # selector.register(server, selectors.EVENT_READ)
-        #
-        # # selector loop
-        # while True:
-        #     events = self.selector.select(CHECK_INTERVAL)
-
     def join_group(self):
+        """
+        Retrieves member list from GCD, deserializes, and assigns to member list field.
+        """
+        # opens connection to gcd, sends JOIN msg, recvs msg, and closes connection
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as gcd:
             JOIN = ('JOIN', (self.pid, self.listener_address))
+            gcd.connect(self.gcd_address)
+            gcd.sendall(pickle.dumps(JOIN))
+            self.members = pickle.loads(gcd.recv(BUF_SZ))
 
-            gcd.connect(self.gcd_address)  # create socket
-            gcd.sendall(pickle.dumps(JOIN))  # send pickled msg
-            self.members = pickle.loads(gcd.recv(BUF_SZ))  # unpickle get msg back
-            print(self.members)
+        # TODO REMOVE PRINT STATEMENT
+        print('>>> GOT MEMBERS LIST FROM GCD')
+        print(self.members)
 
+    def start_election(self, reason):
+        """ Send ELECTION message to all peers that are bigger than me"""
+        # set state
+        self.set_state(State.WAITING_FOR_VICTOR)
+
+        # logic to only send election msgs to peers with pids greater than mine
+        for member_pid in self.members:
+            if member_pid[0] > self.pid[0] or \
+                (member_pid[0] == self.pid[0] and member_pid[1] > self.pid[1]):
+                # TODO self.send_message()
+            else:  # I have the highest processid
+                pass
+
+
+        pass
 
     def send_message(self, peer):
         """
@@ -145,7 +158,21 @@ class Lab2(object):
         pass
 
     def run(self):
-        pass
+
+        # register MY listening socket
+        self.selector.register(self.listener, selectors.EVENT_READ)
+
+        # selector loop
+        while True:
+            events = self.selector.select(CHECK_INTERVAL)
+            for key, mask in events:
+                if key.fileobj == self.listener:  # accept peer
+                    self.accept_peer()
+                elif mask and selectors.EVENT_READ:  # recv msg
+                    self.receive_message(key.fileobj)
+                else:
+                    self.send_message(key.fileobj)  # send msg
+            self.check_timeouts()
 
     def accept_peer(self):
         pass
@@ -164,13 +191,22 @@ class Lab2(object):
         pass
 
     def is_election_in_progress(self):
-        pass
+        """
+        Checks my state to see if we are awaiting a victor.
+        """
+        if self.states[self.pid] == State.WAITING_FOR_VICTOR:
+            return True
+        return False
 
     def is_expired(self, peer=None, threshold=ASSUME_FAILURE_TIMEOUT):
         pass
 
     def set_leader(self, new_leader):
-        pass
+        """
+        Empty bully dict and store newest bully by {pid : new_leader}
+        """
+        self.bully.clear()
+        self.bully[new_leader.pid] = new_leader
 
     def get_state(self, peer=None, switch_mode=False):
         """
@@ -188,15 +224,26 @@ class Lab2(object):
         return status if switch_mode else status[0]
 
     def set_state(self, state, peer=None, switch_mode=False):
-        pass
+
+        if not switch_mode:  # update my own state
+            self.state[self.pid] = state
+        else:                # update a peer's state
+            self.members[peer.pid] = state
+        
 
     def set_quiescent(self, peer=None):
+        """ call when you've sent an election out and didn't hear back in time from
+        this peer, then update their state """
         pass
 
-    def start_election(self, reason):
-        pass
+
 
     def declare_victory(self, reason):
+        """ Send COORDINATOR message to all peers stating I am the bully"""
+
+        # call set_leader
+        # update my state
+        # send message to everyone else
         pass
 
     def update_members(self, their_idea_of_membership):
@@ -242,3 +289,4 @@ if __name__ == '__main__':
     my_peer = Lab2((HOST, GCD_PORT), NEXT_BDAY, SUID)
     print('mypeer created')
     my_peer.join_group()
+    my_peer.run()
