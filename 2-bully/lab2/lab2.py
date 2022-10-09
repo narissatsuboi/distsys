@@ -116,12 +116,9 @@ class Lab2(object):
         for member_pid in self.members:
             if member_pid[0] > self.pid[0] or \
                 (member_pid[0] == self.pid[0] and member_pid[1] > self.pid[1]):
-                # TODO self.send_message()
+                    # TODO self.send_message()
             else:  # I have the highest processid
                 pass
-
-
-        pass
 
     def send_message(self, peer):
         """
@@ -210,7 +207,7 @@ class Lab2(object):
 
     def get_state(self, peer=None, switch_mode=False):
         """
-        Look up current state in state table.
+        Look up member's current state in state table.
 
         :param peer: socket connected to peer process (None means self)
         :param switch_mode: if True, then state and timestamp are both returned
@@ -218,25 +215,30 @@ class Lab2(object):
         found gives(QUIESCENT, None))
         """
 
-        if peer is None:
+        if not switch_mode:
             peer = self
         status = self.states[peer] if peer in self.states else (State.QUIESCENT, None)
         return status if switch_mode else status[0]
 
     def set_state(self, state, peer=None, switch_mode=False):
+        """
+        Set a member's state in the state table.
 
-        if not switch_mode:  # update my own state
-            self.state[self.pid] = state
-        else:                # update a peer's state
+        :param peer: socket connected to peer process (None means self)
+        :param switch_mode: if True, then state and timestamp are both returned
+        """
+
+        if not switch_mode:
+            peer = self
+        else:
             self.members[peer.pid] = state
-        
 
     def set_quiescent(self, peer=None):
         """ call when you've sent an election out and didn't hear back in time from
         this peer, then update their state """
-        pass
-
-
+        if not peer:
+            peer = self
+        self.set_state(State.QUIESCENT, peer)
 
     def declare_victory(self, reason):
         """ Send COORDINATOR message to all peers stating I am the bully"""
