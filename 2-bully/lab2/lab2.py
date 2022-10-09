@@ -76,12 +76,13 @@ class Lab2(object):
         self.gcd_address = (gcd_address[0], int(gcd_address[1]))
         days_to_birthday = (datetime.fromisoformat(
             next_birthday) - datetime.now()).days
-        self.pid = (days_to_birthday, int(su_id))
-        self.members = {}
-        self.states = {}
+        self.pid = (int(days_to_birthday), int(su_id))
+        self.members = {}  # {pid: (host, port), ...}
+        self.states = {}  #  { socket:pid, ...}
         self.bully = {}  # None means election is pending, otherwise pid of bully
         self.selector = selectors.DefaultSelector()
         self.listener, self.listener_address = self.start_a_server()
+        self.set_state(State.WAITING_FOR_ANY_MESSAGE)
 
     @staticmethod
     def start_a_server():
@@ -105,6 +106,7 @@ class Lab2(object):
 
     def start_election(self, reason):
         """ Send ELECTION message to all peers that are bigger than me"""
+        print('in start_election')
         # set state
         self.set_state(State.SEND_ELECTION)
 
@@ -112,26 +114,22 @@ class Lab2(object):
 
         # check if I'm the leader
         for member_pid in self.members:
-            member_days, my_days = member_pid[0], self.pid[0]
-            member_suid, my_suid = member_pid[1], self.pid[1]
+            print(member_pid)
 
-            if member_days > my_days or \
-                    (member_days == my_days and member_suid > my_suid):
-                is_leader = False
-                break
+            # skip myself
+            if member_pid == self.pid:
+                continue
 
-        if is_leader:
-            self.declare_victory()  # send 'COORDINATE'
-        else:
-            # logic to only send election msgs to peers with pids greater than mine
-            for member_pid in self.members:
-                member_days, my_days = member_pid[0], self.pid[0]
-                member_suid, my_suid = member_pid[1], self.pid[1]
+        # logic to only send election msgs to peers with pids greater than mine
+        for member_pid in self.members:
+            if member_pid == self.pid:  # skip myself
+                continue
 
-                # for peers greater than me
-                if member_days > my_days or \
-                        (member_days == my_days and member_suid > my_suid):
-                    self.send_message(member_pid)  # send 'ELECTION'
+            # for peers greater than me
+            if member_pid[0] > self.pid[0] or \
+                    (member_pid[0] == self.pid[0] and member_pid[1] > self.pid[1]):
+                new_socket = self.get_connection(member_pid)
+                self.send_message(new_socket)  # send 'ELECTION'
 
     def send_message(self, peer):
         """
@@ -163,16 +161,15 @@ class Lab2(object):
 
     def send(self, peer, message_name, message_data=None, wait_for_reply=False,
              buffer_size=BUF_SZ):
-        new_socket = self.get_connection(peer)
 
         if self.is_election_in_progress():
-            message_name = self.get_state()
+            message_name = self.get_state(self)
+            self.set_state(State.WAITING_FOR_OK)
 
-        # # TODO is this the right place for this?
-        # if new_socket in self.selector:
-        #     self.selector.unregister(new_socket)
-        # self.selector.register(new_socket, selectors.EVENT_READ | selectors.EVENT_WRITE)
-        new_socket.sendall(pickle.dumps((message_name, message_data)))
+        peer.sendall(pickle.dumps((message_name, message_data)))
+
+        # register
+        self.selector.register(peer, selectors.EVENT_READ)
 
     def run(self):
         """
@@ -219,9 +216,9 @@ class Lab2(object):
     def check_timeouts(self):
         pass
 
-    def get_connection(self, member):
+    def get_connection(self, member_pid):
         new_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        new_socket.connect(self.members[member.pid])
+        new_socket.connect(self.members[member_pid])
         new_socket.setblocking(False)
         return new_socket
         # TODO handle if member can't be connected to
@@ -269,8 +266,7 @@ class Lab2(object):
 
         if not switch_mode:
             peer = self
-        else:
-            self.members[peer.pid] = state
+        self.states[peer] = state
 
     def set_quiescent(self, peer=None):
         """ call when you've sent an election out and didn't hear back in time from
@@ -305,6 +301,7 @@ class Lab2(object):
     def cpr_sock(sock):
         """ Static version of helper for printing given socket """
         l_port = sock.getsockname()[1] % PEER_DIGITS
+
         try:
             r_port = sock.getpeername()[1] % PEER_DIGITS
         except OSError:
@@ -332,5 +329,7 @@ if __name__ == '__main__':
     print('>>> JOINED GROUP')
     print('>>> MEMBERSLIST')
     print(my_peer.members)
+    print('>>> STARTING ELECTION')
+    #my_peer.start_election(State.SEND_ELECTION)
     print('>>> RUNNING EVENT LOOP')
     my_peer.run()
