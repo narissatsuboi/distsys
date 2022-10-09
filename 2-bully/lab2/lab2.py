@@ -89,7 +89,7 @@ class Lab2(object):
         listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         listener.bind(('localhost', 0))  # use any free socket
         listener.listen(100)  # allow backlog of 100
-        listener.setblocking(False)
+        listener.setblocking(False)  # non blocking socket
         return listener, listener.getsockname()  # getsockname format (host, port)
 
     def join_group(self):
@@ -103,22 +103,35 @@ class Lab2(object):
             gcd.sendall(pickle.dumps(JOIN))
             self.members = pickle.loads(gcd.recv(BUF_SZ))
 
-        # TODO REMOVE PRINT STATEMENT
-        print('>>> GOT MEMBERS LIST FROM GCD')
-        print(self.members)
-
     def start_election(self, reason):
         """ Send ELECTION message to all peers that are bigger than me"""
         # set state
-        self.set_state(State.WAITING_FOR_VICTOR)
+        self.set_state(State.SEND_ELECTION)
 
-        # logic to only send election msgs to peers with pids greater than mine
+        is_leader = True
+
+        # check if I'm the leader
         for member_pid in self.members:
-            if member_pid[0] > self.pid[0] or \
-                (member_pid[0] == self.pid[0] and member_pid[1] > self.pid[1]):
-                    # TODO self.send_message()
-            else:  # I have the highest processid
-                pass
+            member_days, my_days = member_pid[0], self.pid[0]
+            member_suid, my_suid = member_pid[1], self.pid[1]
+
+            if member_days > my_days or \
+                    (member_days == my_days and member_suid > my_suid):
+                is_leader = False
+                break
+
+        if is_leader:
+            self.declare_victory()  # send 'COORDINATE'
+        else:
+            # logic to only send election msgs to peers with pids greater than mine
+            for member_pid in self.members:
+                member_days, my_days = member_pid[0], self.pid[0]
+                member_suid, my_suid = member_pid[1], self.pid[1]
+
+                # for peers greater than me
+                if member_days > my_days or \
+                        (member_days == my_days and member_suid > my_suid):
+                    self.send_message(member_pid)  # send 'ELECTION'
 
     def send_message(self, peer):
         """
@@ -127,6 +140,7 @@ class Lab2(object):
         :param peer:
         :return:
         """
+
         state = self.get_state(peer)
         print('{}: sending {} [{}]'.format(self.pr_sock(peer), state.value,
                                            self.pr_now()))
@@ -147,14 +161,23 @@ class Lab2(object):
         else:
             self.set_quiescent(peer)
 
-        # create socket thru handle response
-
-    @classmethod  # uses the class to know which receive method to call
-    def send(cls, peer, message_name, message_data=None, wait_for_reply=False,
+    def send(self, peer, message_name, message_data=None, wait_for_reply=False,
              buffer_size=BUF_SZ):
-        pass
+        new_socket = self.get_connection(peer)
+
+        if self.is_election_in_progress():
+            message_name = self.get_state()
+
+        # # TODO is this the right place for this?
+        # if new_socket in self.selector:
+        #     self.selector.unregister(new_socket)
+        # self.selector.register(new_socket, selectors.EVENT_READ | selectors.EVENT_WRITE)
+        new_socket.sendall(pickle.dumps((message_name, message_data)))
 
     def run(self):
+        """
+        Runs event loop
+        """
 
         # register MY listening socket
         self.selector.register(self.listener, selectors.EVENT_READ)
@@ -162,17 +185,29 @@ class Lab2(object):
         # selector loop
         while True:
             events = self.selector.select(CHECK_INTERVAL)
+
+            print(events)
+
             for key, mask in events:
                 if key.fileobj == self.listener:  # accept peer
                     self.accept_peer()
                 elif mask and selectors.EVENT_READ:  # recv msg
                     self.receive_message(key.fileobj)
-                else:
+                else:  # mask and selectors.EVENT_WRITE
                     self.send_message(key.fileobj)  # send msg
             self.check_timeouts()
 
     def accept_peer(self):
-        pass
+        """
+        Accept new TCP/IP connections from a peer (TCP handshake)
+        """
+        print('in accept_peer')
+        try:
+            peer, _addr = self.listener.accept()
+            print('{}: accepted [{}]'.format(self.pr_sock(peer), self.pr_now()))
+            self.set_state(State.WAITING_FOR_ANY_MESSAGE, peer)
+        except socket_error as serr:
+            print('accept failed {}'.format(serr))
 
     def receive_message(self, peer):
         pass
@@ -185,7 +220,11 @@ class Lab2(object):
         pass
 
     def get_connection(self, member):
-        pass
+        new_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        new_socket.connect(self.members[member.pid])
+        new_socket.setblocking(False)
+        return new_socket
+        # TODO handle if member can't be connected to
 
     def is_election_in_progress(self):
         """
@@ -287,8 +326,11 @@ if __name__ == '__main__':
         exit(1)
 
     HOST, GCD_PORT, NEXT_BDAY, SUID = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
-    print(HOST, GCD_PORT, NEXT_BDAY, SUID)
     my_peer = Lab2((HOST, GCD_PORT), NEXT_BDAY, SUID)
-    print('mypeer created')
+    print('>>> NEW PEER CREATED')
     my_peer.join_group()
+    print('>>> JOINED GROUP')
+    print('>>> MEMBERSLIST')
+    print(my_peer.members)
+    print('>>> RUNNING EVENT LOOP')
     my_peer.run()
