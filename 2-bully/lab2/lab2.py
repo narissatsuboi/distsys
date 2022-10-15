@@ -25,11 +25,12 @@ import sys
 import datetime
 from datetime import datetime
 
-BUF_SZ = 1024               # max msg size in bytes
-CHECK_INTERVAL = 1.5        # ms to wait before checking for events in list serv
-PEER_DIGITS = 10            # used to shorten the port numbers is cpr_sock
+BUF_SZ = 1024  # max msg size in bytes
+CHECK_INTERVAL = 1.5  # ms to wait before checking for events in list serv
+PEER_DIGITS = 10  # used to shorten the port numbers is cpr_sock
 ASSUME_FAILURE_TIMEOUT = 5  # ms to wait before assuming host has failed
 QUEUE_SIZE = 100
+
 
 class State(Enum):
     """
@@ -86,7 +87,7 @@ class Lab2(object):
         self.members = {}  # {pid: (host, port), ...}
 
         # dictionary of the states of all members known to this node
-        self.states = {}  #  { socket:pid, ...}
+        self.states = {}  # { socket:pid, ...}
 
         # identity of the current leader
         self.bully = None  # None means election is pending, otherwise pid of bully
@@ -132,7 +133,6 @@ class Lab2(object):
         except socket_error as serr:
             print('accept failed {}'.format(serr))
 
-
     def join_group(self):
         """
         Joins the other live notes via the Group Coordinator Daemon.
@@ -141,7 +141,6 @@ class Lab2(object):
 
         # opens connection to gcd, sends JOIN msg, recvs msg, and closes connection
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as gcd:
-
             # GCD accepts tuple of pid and listener socket address only
             data = (self.pid, self.listener_address)
             print('JOIN {}, {}'.format(self.gcd_address, data))  # log
@@ -156,36 +155,28 @@ class Lab2(object):
             if type(self.members) != dict:
                 raise TypeError('wrong data type from GCD: {}'.format(self.members))
 
-
     def start_election(self, reason):
         """
         Send ELECTION message to all peers that outrank this node.
 
+        :param reason: note for log
         """
-        print('in start_election')
-        # set state
-        self.set_state(State.SEND_ELECTION)
+        print('Starting an election {}'.format(reason))
 
-        is_leader = True
+        self.set_state(State.SEND_ELECTION)  # set MY state, election now in progress
 
-        # check if I'm the leader
-        for member_pid in self.members:
-
-            # skip myself
-            if member_pid == self.pid:
-                # TODO check my state, if this node is the leader, call declare_victory
-                continue  # if not the leader
+        am_leader = True
 
         # logic to only send election msgs to peers with pids greater than mine
-        for member_pid in self.members:
-            if member_pid == self.pid:  # skip myself
-                continue
-
-            # for peers greater than me
-            if member_pid[0] > self.pid[0] or \
-                    (member_pid[0] == self.pid[0] and member_pid[1] > self.pid[1]):
-                new_socket = self.get_connection(member_pid)
-                self.send_message(new_socket)  # send 'ELECTION'
+        for member in self.members:
+            if member > self.pid:
+                peer = self.get_connection(member)
+                if peer is None:
+                    continue
+                self.set_state(State.SEND_ELECTION, peer)
+                am_leader = False  # found someone bigger than me
+        if am_leader:
+            self.declare_victory('no other members bigger than me')
 
     def send_message(self, peer):
         """
@@ -228,9 +219,6 @@ class Lab2(object):
 
         # register
         self.selector.register(peer, selectors.EVENT_READ)
-
-
-
 
     def receive_message(self, peer):
         pass
@@ -329,7 +317,7 @@ class Lab2(object):
         listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         listener.bind(('localhost', 0))  # use any free socket
         listener.listen(QUEUE_SIZE)
-        listener.setblocking(False)      # non blocking socket
+        listener.setblocking(False)  # non blocking socket
         return listener, listener.getsockname()
 
     @staticmethod
