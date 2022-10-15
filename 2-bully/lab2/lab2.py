@@ -165,7 +165,7 @@ class Lab2(object):
 
         self.set_state(State.SEND_ELECTION)  # set MY state, election now in progress
 
-        am_leader = True
+        am_leader = True  # flag for biggest bully not found
 
         # logic to only send election msgs to peers with pids greater than mine
         for member in self.members:
@@ -180,9 +180,8 @@ class Lab2(object):
 
     def send_message(self, peer):
         """
-        Send the queued msg to the given peer (based on its current state
-
-        :param peer:
+        Send the queued msg to the given peer.
+        :param peer: socket connected to the socket selector in run
         """
 
         state = self.get_state(peer)
@@ -205,20 +204,27 @@ class Lab2(object):
         else:
             self.set_quiescent(peer)
 
-    def send(self, peer, message_name, message_data=None, wait_for_reply=False,
+    def send(cls, peer, message_name, message_data=None, wait_for_reply=False,
              buffer_size=BUF_SZ):
+        """
+        Marshalls and sends the msg to the given socket and unmarshalls the returned
+        msg.
 
-        if self.is_election_in_progress():
-            message_name = self.get_state(self)
-            self.set_state(State.WAITING_FOR_OK)
+        :param peer: socket to send and recv from
+        :param message_name: text message name 'OK', 'ELECTION'
+        :param message_data: data to be marshalled
+        :param wait_for_reply: only True if blocking desired
+        :param buffer_size: if blocking, buffer size
+        :return: if blocking, returns response else None
+        """
 
-        if self.get_state(self) == State.SEND_VICTORY:
-            message_name = State.SEND_VICTORY
+        # assemble and send msg to peer
+        message = message_name if message_data is None else (message_name, message_data)
+        peer.sendall(pickle.dumps(message))
 
-        peer.sendall(pickle.dumps((message_name, message_data)))
-
-        # register
-        self.selector.register(peer, selectors.EVENT_READ)
+        # if blocking, wait for a reply
+        if wait_for_reply:
+            return cls.receive(peer, buffer_size)
 
     def receive_message(self, peer):
         pass
