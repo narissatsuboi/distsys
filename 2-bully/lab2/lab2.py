@@ -230,8 +230,27 @@ class Lab2(object):
         pass
 
     @staticmethod
-    def receive(peer, buffer_siz=BUF_SZ):
-        pass
+    def receive(peer, buffer_size=BUF_SZ):
+        """
+        Recvs and unmarshalls incoming msg from the peer.
+
+        :param peer: socket to recv msg from
+        :param buffer_size: buffer size of the listening socket
+        :return: unmarshalled msg
+        """
+
+        # store buffer
+        packet = peer.recv(buffer_size)
+
+        # handle None response when socket is closed
+        if not packet:
+            raise ValueError('socket closed')
+
+        # unmarshall data and return
+        data = pickle.loads(packet)
+        if type(data) == str:
+            data = (data, None)  # format msg into tuple
+        return data
 
     def check_timeouts(self):
         pass
