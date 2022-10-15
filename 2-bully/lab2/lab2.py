@@ -3,12 +3,19 @@ CPSC 5520, Seattle University
 This is free and unencumbered software released into the public domain.
 :Authors: Narissa Tsuboi
 :Version: 1
-:brief:
+:brief: An implementation of the 'Bully' algorithm used to dynamically achieve
+consensus by choosing a leader from a group of distributed processes. The intent
+of the implementation is to execute asynchronously using nonblocking sockets and
+state machine.
+
+THIS LAB IS UNFINISHED AND DOES NOT RUN, I COULD NOT FIGURE IT OUT
+AFTER 25 HRS.
 
 References
 https://docs.python.org/3/library/selectors.html
-
+https://en.wikipedia.org/wiki/Bully_algorithm
 """
+
 import selectors  # used to wait for I/O readiness notification on multiple file objects
 import socket
 from enum import Enum
@@ -17,19 +24,12 @@ import pickle
 import sys
 import datetime
 from datetime import datetime
-from datetime import timedelta
 
-# TODO confirm or justify this value
-CHECK_INTERVAL = 1.5  # ms to wait before checking for events in list serv
-
-# TODO figure out what this is and what the actual number is supposed to be
-PEER_DIGITS = 1
-
-# TODO justify
-ASSUME_FAILURE_TIMEOUT = 5
-
-BUF_SZ = 1024
-
+BUF_SZ = 1024               # max msg size in bytes
+CHECK_INTERVAL = 1.5        # ms to wait before checking for events in list serv
+PEER_DIGITS = 10            # used to shorten the port numbers is cpr_sock
+ASSUME_FAILURE_TIMEOUT = 5  # ms to wait before assuming host has failed
+QUEUE_SIZE = 100
 
 class State(Enum):
     """
@@ -41,8 +41,6 @@ class State(Enum):
     SEND_ELECTION = 'ELECTION'
     SEND_VICTORY = 'COORDINATOR'
     SEND_OK = 'OK'
-
-    # incoming msg is pending
 
     # when I've sent an ELECTION msg
     WAITING_FOR_OK = 'WAIT_OK'
@@ -60,10 +58,11 @@ class State(Enum):
 
 class Lab2(object):
     """
-    Group Coordinator Daemon (GCD)
+    Implementation of a single node that has its own identity (pid), can join the
+    network of other nodes by connecting with the Group Coordinator Daemon (GCD),
+    and participate in elections.
     """
 
-    # TODO Figure out the format that next_birthday is assumed to be
     def __init__(self, gcd_address, next_birthday, su_id):
         """
         Constructs a Lab2 object to talk to the given GCD
@@ -73,107 +72,34 @@ class Lab2(object):
         :param su_id: user's six digit seattle u id
         """
 
+        # address and port of gcd
         self.gcd_address = (gcd_address[0], int(gcd_address[1]))
+
+        # calculates the unique parameter for this node's pid
         days_to_birthday = (datetime.fromisoformat(
             next_birthday) - datetime.now()).days
+
+        # unique node process id
         self.pid = (int(days_to_birthday), int(su_id))
+
+        # dictionary of all members known to this node
         self.members = {}  # {pid: (host, port), ...}
+
+        # dictionary of the states of all members known to this node
         self.states = {}  #  { socket:pid, ...}
-        self.bully = {}  # None means election is pending, otherwise pid of bully
+
+        # identity of the current leader
+        self.bully = None  # None means election is pending, otherwise pid of bully
+
+        # tcp socket selector
         self.selector = selectors.DefaultSelector()
+
+        # server side listener socket
         self.listener, self.listener_address = self.start_a_server()
-        self.set_state(State.WAITING_FOR_ANY_MESSAGE)
-
-    @staticmethod
-    def start_a_server():
-        # set up listening server
-        listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        listener.bind(('localhost', 0))  # use any free socket
-        listener.listen(100)  # allow backlog of 100
-        listener.setblocking(False)  # non blocking socket
-        return listener, listener.getsockname()  # getsockname format (host, port)
-
-    def join_group(self):
-        """
-        Retrieves member list from GCD, deserializes, and assigns to member list field.
-        """
-        # opens connection to gcd, sends JOIN msg, recvs msg, and closes connection
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as gcd:
-            JOIN = ('JOIN', (self.pid, self.listener_address))
-            gcd.connect(self.gcd_address)
-            gcd.sendall(pickle.dumps(JOIN))
-            self.members = pickle.loads(gcd.recv(BUF_SZ))
-
-    def start_election(self, reason):
-        """ Send ELECTION message to all peers that are bigger than me"""
-        print('in start_election')
-        # set state
-        self.set_state(State.SEND_ELECTION)
-
-        is_leader = True
-
-        # check if I'm the leader
-        for member_pid in self.members:
-            print(member_pid)
-
-            # skip myself
-            if member_pid == self.pid:
-                continue
-
-        # logic to only send election msgs to peers with pids greater than mine
-        for member_pid in self.members:
-            if member_pid == self.pid:  # skip myself
-                continue
-
-            # for peers greater than me
-            if member_pid[0] > self.pid[0] or \
-                    (member_pid[0] == self.pid[0] and member_pid[1] > self.pid[1]):
-                new_socket = self.get_connection(member_pid)
-                self.send_message(new_socket)  # send 'ELECTION'
-
-    def send_message(self, peer):
-        """
-        Send the queued msg to the given peer (based on its current state
-
-        :param peer:
-        :return:
-        """
-
-        state = self.get_state(peer)
-        print('{}: sending {} [{}]'.format(self.pr_sock(peer), state.value,
-                                           self.pr_now()))
-        try:
-            # should be ready, but may be a failed connect instead
-            self.send(peer, state.value, self.members)
-
-        except ConnectionError as err:  # TODO better exception handling later
-            print('error sending exiting send_msg')
-            pass
-        except Exception as err:
-            print('error sending exiting send_msg')
-            pass
-
-        # check to see if we want to wait for response immediately
-        if state == State.SEND_ELECTION:
-            self.set_state(State.WAITING_FOR_OK, peer, switch_mode=True)
-        else:
-            self.set_quiescent(peer)
-
-    def send(self, peer, message_name, message_data=None, wait_for_reply=False,
-             buffer_size=BUF_SZ):
-
-        if self.is_election_in_progress():
-            message_name = self.get_state(self)
-            self.set_state(State.WAITING_FOR_OK)
-
-        peer.sendall(pickle.dumps((message_name, message_data)))
-
-        # register
-        self.selector.register(peer, selectors.EVENT_READ)
 
     def run(self):
         """
-        Runs event loop
+        Runs event loop and performs action on sockets queued up in selector.
         """
 
         # register MY listening socket
@@ -206,6 +132,106 @@ class Lab2(object):
         except socket_error as serr:
             print('accept failed {}'.format(serr))
 
+
+    def join_group(self):
+        """
+        Joins the other live notes via the Group Coordinator Daemon.
+        Retrieves member list from GCD, deserializes, and assigns to member list field.
+        """
+
+        # opens connection to gcd, sends JOIN msg, recvs msg, and closes connection
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as gcd:
+
+            # GCD accepts tuple of pid and listener socket address only
+            data = (self.pid, self.listener_address)
+            print('JOIN {}, {}'.format(self.gcd_address, data))  # log
+
+            # attempt to connect to the gcd
+            gcd.connect(self.gcd_address)
+
+            # get members dict by using send method
+            self.members = self.send(gcd, 'JOIN', data, wait_for_reply=True)
+
+            # expect a dictionary from the GCD, if not raise error
+            if type(self.members) != dict:
+                raise TypeError('wrong data type from GCD: {}'.format(self.members))
+
+
+    def start_election(self, reason):
+        """
+        Send ELECTION message to all peers that outrank this node.
+
+        """
+        print('in start_election')
+        # set state
+        self.set_state(State.SEND_ELECTION)
+
+        is_leader = True
+
+        # check if I'm the leader
+        for member_pid in self.members:
+
+            # skip myself
+            if member_pid == self.pid:
+                # TODO check my state, if this node is the leader, call declare_victory
+                continue  # if not the leader
+
+        # logic to only send election msgs to peers with pids greater than mine
+        for member_pid in self.members:
+            if member_pid == self.pid:  # skip myself
+                continue
+
+            # for peers greater than me
+            if member_pid[0] > self.pid[0] or \
+                    (member_pid[0] == self.pid[0] and member_pid[1] > self.pid[1]):
+                new_socket = self.get_connection(member_pid)
+                self.send_message(new_socket)  # send 'ELECTION'
+
+    def send_message(self, peer):
+        """
+        Send the queued msg to the given peer (based on its current state
+
+        :param peer:
+        """
+
+        state = self.get_state(peer)
+        print('{}: sending {} [{}]'.format(self.pr_sock(peer), state.value,
+                                           self.pr_now()))
+        try:
+            # should be ready, but may be a failed connect instead
+            self.send(peer, state.value, self.members)
+
+        except ConnectionError as err:  # TODO better exception handling later
+            print('error sending exiting send_msg')
+            pass
+        except Exception as err:
+            print('error sending exiting send_msg')
+            pass
+
+        # check to see if we want to wait for response immediately
+        if state == State.SEND_ELECTION:
+            self.set_state(State.WAITING_FOR_OK, peer, switch_mode=True)
+        else:
+            self.set_quiescent(peer)
+
+    def send(self, peer, message_name, message_data=None, wait_for_reply=False,
+             buffer_size=BUF_SZ):
+
+        if self.is_election_in_progress():
+            message_name = self.get_state(self)
+            self.set_state(State.WAITING_FOR_OK)
+
+        if self.get_state(self) == State.SEND_VICTORY:
+            message_name = State.SEND_VICTORY
+
+        peer.sendall(pickle.dumps((message_name, message_data)))
+
+        # register
+        self.selector.register(peer, selectors.EVENT_READ)
+
+
+
+
     def receive_message(self, peer):
         pass
 
@@ -236,10 +262,9 @@ class Lab2(object):
 
     def set_leader(self, new_leader):
         """
-        Empty bully dict and store newest bully by {pid : new_leader}
+
         """
-        self.bully.clear()
-        self.bully[new_leader.pid] = new_leader
+        self.bully = new_leader
 
     def get_state(self, peer=None, switch_mode=False):
         """
@@ -271,6 +296,7 @@ class Lab2(object):
     def set_quiescent(self, peer=None):
         """ call when you've sent an election out and didn't hear back in time from
         this peer, then update their state """
+
         if not peer:
             peer = self
         self.set_state(State.QUIESCENT, peer)
@@ -279,12 +305,32 @@ class Lab2(object):
         """ Send COORDINATOR message to all peers stating I am the bully"""
 
         # call set_leader
+        self.set_leader(self.pid)
         # update my state
+        self.set_state(State.SEND_VICTORY)
         # send message to everyone else
-        pass
+        for member_pid in self.members:
+            if member_pid == self.pid:  # skip myself
+                continue
+            new_socket = self.get_connection(member_pid)
+            self.send_message(new_socket)
 
     def update_members(self, their_idea_of_membership):
         pass
+
+    @staticmethod
+    def start_a_server():
+        """
+        Opens a non-blocking listening socket on localhost.
+
+        :return: listener socket and address
+        """
+        # set up listening server
+        listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        listener.bind(('localhost', 0))  # use any free socket
+        listener.listen(QUEUE_SIZE)
+        listener.setblocking(False)      # non blocking socket
+        return listener, listener.getsockname()
 
     @staticmethod
     def pr_now():
@@ -330,6 +376,6 @@ if __name__ == '__main__':
     print('>>> MEMBERSLIST')
     print(my_peer.members)
     print('>>> STARTING ELECTION')
-    #my_peer.start_election(State.SEND_ELECTION)
+    my_peer.start_election(State.SEND_ELECTION)
     print('>>> RUNNING EVENT LOOP')
     my_peer.run()
