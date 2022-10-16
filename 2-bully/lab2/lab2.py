@@ -303,7 +303,7 @@ class Lab2(object):
         """
         Get a socket for a member. Connection will be non-blocking,
         must use selector to pick it up when its writable.
-        
+
         :param member_pid: process id of peer
         :return: socket
         """
@@ -327,9 +327,7 @@ class Lab2(object):
         """
         Checks my state to see if we are awaiting a victor.
         """
-        if self.states[self.pid] == State.WAITING_FOR_VICTOR:
-            return True
-        return False
+        return self.bully is None
 
     def is_expired(self, peer=None, threshold=ASSUME_FAILURE_TIMEOUT):
         pass
