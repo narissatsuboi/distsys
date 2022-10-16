@@ -346,9 +346,10 @@ class Lab2(object):
 
     def set_leader(self, new_leader):
         """
-
+        Set the current leader. Sets self.bully to that leader.  
         """
         self.bully = new_leader
+        print('Leader is {}'.format(self.pr_leader()))
 
     def get_state(self, peer=None, switch_mode=False):
         """
