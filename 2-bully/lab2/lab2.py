@@ -289,7 +289,15 @@ class Lab2(object):
         return data
 
     def check_timeouts(self):
-        pass
+        """
+        Check if peers (including me) have timed out.
+        """
+
+        if self.is_expired():
+            if self.get_state() == State.WAITING_FOR_OK:
+                self.declare_victory('timed out from waiting from ok from peers')
+            else:
+                self.start_election('timed out waiting for coordinate from peers')
 
     def get_connection(self, member_pid):
         new_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
