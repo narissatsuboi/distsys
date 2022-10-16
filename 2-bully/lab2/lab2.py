@@ -227,7 +227,43 @@ class Lab2(object):
             return cls.receive(peer, buffer_size)
 
     def receive_message(self, peer):
-        pass
+        """
+        Recv msg from peer and update state based on ELECTION, COORDINATOR, OK.
+
+        :param peer: socket to recv from
+        """
+
+        # recv msg from peer, handle connection error and socket errors
+        try:
+            message_name, their_idea = self.receive(peer)
+            print('{}: received {} [{}]'.format(self.pr_sock(peer), message_name, self.pr_now()))
+        except ConnectionError as err:
+            print('closing: {}'.format(err))
+            self.set_quiescent(peer)
+            return
+        except socket_error as serr:
+            print('failed {}'.format(serr))
+            if self.is_expired(peer):
+                print('peer timed out')
+                self.set_quiescent(peer)
+            return
+
+        # update members with their idea of state
+        self.update_members(their_idea)
+
+        # make state transition based on rec'd msg
+        if message_name == 'ELECTION':
+            self.set_state(State.SEND_OK, peer)
+            if not self.is_election_in_progress():
+                self.start_election('Got a VOTE card')
+        elif message_name == 'COORDINATOR':
+            self.set_leader('someone else is the leader')
+            self.set_quiescent(peer)
+            self.set_quiescent()
+        elif message_name == 'OK':
+            if self.get_state() == State.WAITING_FOR_OK:
+                self.set_state(State.WAITING_FOR_VICTOR)  #recd an OK ignore others
+            self.set_quiescent(peer)
 
     @staticmethod
     def receive(peer, buffer_size=BUF_SZ):
