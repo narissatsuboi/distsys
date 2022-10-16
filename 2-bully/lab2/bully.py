@@ -57,7 +57,7 @@ class State(Enum):
         return self not in (State.SEND_ELECTION, State.SEND_VICTORY, State.SEND_OK)
 
 
-class Lab2(object):
+class Bully(object):
     """
     Implementation of a single node that has its own identity (pid), can join the
     network of other nodes by connecting with the Group Coordinator Daemon (GCD),
@@ -431,7 +431,16 @@ class Lab2(object):
         self.set_quiescent()
 
     def update_members(self, their_idea_of_membership):
-        pass
+        """
+        Add members from the peer's memberlist that we didn't already know to our
+        members list
+
+        :param their_idea_of_membership: the peer's idea of membership in the group
+        """
+
+        if their_idea_of_membership is not None:
+            for member in their_idea_of_membership:
+                self.members[member] = their_idea_of_membership[member]
 
     @staticmethod
     def start_a_server():
@@ -479,18 +488,23 @@ class Lab2(object):
 if __name__ == '__main__':
     print('Bully')
     # handle invalid command line args count
-    if len(sys.argv) != 5:
-        print("Usage: python3 lab2 (IP, port) 'YYYY-MM-DD' suid")
+    if not 4 <= len(sys.argv) <= 5:
+        print("Usage: python bully.py (IP, port) 'YYYY-MM-DD' suid")
         exit(1)
 
-    HOST, GCD_PORT, NEXT_BDAY, SUID = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
-    my_peer = Lab2((HOST, GCD_PORT), NEXT_BDAY, SUID)
-    print('>>> NEW PEER CREATED')
-    my_peer.join_group()
-    print('>>> JOINED GROUP')
-    print('>>> MEMBERSLIST')
-    print(my_peer.members)
-    print('>>> STARTING ELECTION')
-    my_peer.start_election(State.SEND_ELECTION)
-    print('>>> RUNNING EVENT LOOP')
-    my_peer.run()
+    # start program
+    if len(sys.argv) == 5:
+        args = sys.argv[4].split('-')
+        now = datetime.now()
+        next_birthday = datetime(now.year, int(args[1], int(args[2]),))
+        if next_birthday < now:
+            next_birthday = datetime(next_birthday.year + 1, next_birthday.month,
+                                     next_birthday.day)
+        else:
+            next_birthday = datetime(2020, 1, 1)
+    print('Next Birthday:', next_birthday)
+    suid = int(sys.argv[3])
+    print('Student ID:', suid)
+    bully = Bully(sys.argv[1:3], next_birthday, suid)
+
+
