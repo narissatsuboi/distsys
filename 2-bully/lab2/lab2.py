@@ -410,24 +410,25 @@ class Lab2(object):
     def set_quiescent(self, peer=None):
         """ call when you've sent an election out and didn't hear back in time from
         this peer, then update their state """
-
-        if not peer:
-            peer = self
         self.set_state(State.QUIESCENT, peer)
 
     def declare_victory(self, reason):
         """ Send COORDINATOR message to all peers stating I am the bully"""
+
+        print('Victory by {} {}'.format(self.pid, reason))
 
         # call set_leader
         self.set_leader(self.pid)
         # update my state
         self.set_state(State.SEND_VICTORY)
         # send message to everyone else
-        for member_pid in self.members:
-            if member_pid == self.pid:  # skip myself
-                continue
-            new_socket = self.get_connection(member_pid)
-            self.send_message(new_socket)
+        for member in self.members:
+            if member != self.pid:  # skip myself
+                peer = self.get_connection(member)
+                if peer is None: continue
+
+                self.set_state(State.SEND_VICTORY, peer)
+        self.set_quiescent()
 
     def update_members(self, their_idea_of_membership):
         pass
