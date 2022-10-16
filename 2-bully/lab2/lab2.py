@@ -299,12 +299,29 @@ class Lab2(object):
             else:
                 self.start_election('timed out waiting for coordinate from peers')
 
-    def get_connection(self, member_pid):
-        new_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        new_socket.connect(self.members[member_pid])
-        new_socket.setblocking(False)
-        return new_socket
-        # TODO handle if member can't be connected to
+    def get_connection(self, member):
+        """
+        Get a socket for a member. Connection will be non-blocking,
+        must use selector to pick it up when its writable.
+        
+        :param member_pid: process id of peer
+        :return: socket
+        """
+
+        # look up member's address
+        listener = self.members[member]
+        peer = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        peer.setblocking(False)
+
+        try:
+            peer.connect(listener)
+        except BlockingIOError:  # handle connection still in progress
+            pass
+        except socket_error as serr:
+            print('FAILURE: couldnt connect to member {}'.format(serr))
+            return None
+
+        return peer
 
     def is_election_in_progress(self):
         """
