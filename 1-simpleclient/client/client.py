@@ -93,7 +93,7 @@ if __name__ == '__main__':
 
     # handle invalid command line args
     if len(sys.argv) != 3:
-        print("Usage: python3 lab1.py HOST PORT")
+        print("Usage: python client.py HOST PORT")
         exit(1);
 
     HOST, GCD_PORT = sys.argv[1], int(sys.argv[2])
