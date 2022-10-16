@@ -20,14 +20,19 @@ class Client(object):
     Client object attempts to perform process in file brief.
     """
 
-    def __init__(self, buffer_size=1024, timeout=1.5):
-        """"
-        Constructor.
-        :param: buffer size in bytes
-        :param: time in seconds to wait before socket timeout
+    BUF_SZ = 1024  # msg buffer size in bs
+
+    def __init__(self, host, port):
         """
-        self.buffer_size = buffer_size
-        self.timeout = timeout
+        Instantiates a client object to connect with GCD and neighbor nodes.
+
+        :param host: host name
+        :param port: port number of host
+        """
+
+        self.host, self.port = host, port
+        self.members = []
+        self.timeout = 1.5  # seconds
 
     def send_message(self, host, port, msg) -> str:
         """
@@ -71,8 +76,7 @@ if __name__ == '__main__':
 
     GCD_MSG = 'JOIN'  # only msg GCD will accept
     NBR_MSG = 'HELLO'  # only msg neighbor clients will accept
-    BUF_SZ = 1024  # msg buffer size in bs
-    TIMEOUT = 1.5  # socket timeout duration
+
 
     # handle invalid command line args
     if len(sys.argv) != 3:
