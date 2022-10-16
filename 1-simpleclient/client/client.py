@@ -20,14 +20,14 @@ class Client(object):
     Client object attempts to perform process in file brief.
     """
 
-    def __init__(self, buffer_size=1024, wait=1.5):
+    def __init__(self, buffer_size=1024, timeout=1.5):
         """"
         Constructor.
         :param: buffer size in bytes
         :param: time in seconds to wait before socket timeout
         """
         self.buffer_size = buffer_size
-        self.wait = wait
+        self.timeout = timeout
 
     def send_message(self, host, port, msg) -> str:
         """
@@ -43,7 +43,7 @@ class Client(object):
         # create socket
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             # connect socket
-            s.settimeout(self.wait)
+            s.settimeout(self.timeout)
             try:
                 s.connect((host, port))
             except socket_error as serr:
