@@ -346,7 +346,7 @@ class Lab2(object):
 
     def set_leader(self, new_leader):
         """
-        Set the current leader. Sets self.bully to that leader.  
+        Set the current leader. Sets self.bully to that leader.
         """
         self.bully = new_leader
         print('Leader is {}'.format(self.pr_leader()))
@@ -374,9 +374,38 @@ class Lab2(object):
         :param switch_mode: if True, then state and timestamp are both returned
         """
 
-        if not switch_mode:
+        print('{}: {}'.format(self.pr_sock(peer), state.name))
+
+        if peer is None:
             peer = self
-        self.states[peer] = state
+
+        # who to register as event.write or event.read in the selector
+        if state.is_incoming():
+            mask = selectors.EVENT_READ
+        else:
+            mask = selectors.EVENT_WRITE
+
+        # if QUIESCENT lets remove it from the members list
+        if state == State.QUIESCENT:
+            if peer in self.states:
+                if peer != self:
+                    self.selector.unregister(peer)
+                del self.states[peer]
+            if len(self.states) == 0:
+                print('{} (leader: {})\n'.format(self.pr_now(), self.pr_leader()))
+            return
+
+        # handle new state and adjust selector
+        if peer != self and peer not in self.states:
+            peer.setblocking(False)
+            self.selector.register(peer, mask)
+        elif switch_mode:
+            self.selector.modify(peer, mask)
+        self.states[peer] = (state, datetime.now())
+
+        # send msg write away if writeable
+        if mask == selectors.EVENT_WRITE:
+            self.send_message(peer)
 
     def set_quiescent(self, peer=None):
         """ call when you've sent an election out and didn't hear back in time from
