@@ -15,10 +15,9 @@ from socket import error as socket_error
 import sys
 
 
-class Client:
+class Client(object):
     """
-    Client object with settable message buffer size and wait time
-    properties.
+    Client object attempts to perform process in file brief.
     """
 
     def __init__(self, buffer_size=1024, wait=1.5):
@@ -29,22 +28,6 @@ class Client:
         """
         self.buffer_size = buffer_size
         self.wait = wait
-
-    @property
-    def buffer_size(self) -> int:
-        return self._buffer_size
-
-    @buffer_size.setter
-    def buffer_size(self, value) -> int:
-        self._buffer_size = value
-
-    @property
-    def wait(self) -> int:
-        return self._wait
-
-    @wait.setter
-    def wait(self, value) -> None:
-        self._wait = value
 
     def send_message(self, host, port, msg) -> str:
         """
