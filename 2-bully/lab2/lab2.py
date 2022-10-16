@@ -330,7 +330,19 @@ class Lab2(object):
         return self.bully is None
 
     def is_expired(self, peer=None, threshold=ASSUME_FAILURE_TIMEOUT):
-        pass
+        """
+        Check if peers state was set more than threshold seconds ago. If so,
+        peer expired.
+
+        :param peer: socket connected to peer process, None means self
+        :param threshold: seconds to wait since last state change
+        :return: True if past threshold
+        """
+        my_state, when = self.get_state(peer, detail=True)
+        if my_state == State.QUIESCENT:
+            return False
+        time_since = (datetime.now() - when).total_seconds()
+        return time_since > threshold
 
     def set_leader(self, new_leader):
         """
