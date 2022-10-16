@@ -1,15 +1,11 @@
 """"
-CPSC 5520, Seattle University
-This is free and unencumbered software released into the public domain.
+Bully Consensus Algorithm
 :Authors: Narissa Tsuboi
 :Version: 1
 :brief: An implementation of the 'Bully' algorithm used to dynamically achieve
 consensus by choosing a leader from a group of distributed processes. The intent
 of the implementation is to execute asynchronously using nonblocking sockets and
 state machine.
-
-THIS LAB IS UNFINISHED AND DOES NOT RUN, I COULD NOT FIGURE IT OUT
-AFTER 25 HRS.
 
 References
 https://docs.python.org/3/library/selectors.html
@@ -506,5 +502,3 @@ if __name__ == '__main__':
     suid = int(sys.argv[3])
     print('Student ID:', suid)
     bully = Bully(sys.argv[1:3], next_birthday, suid)
-
-
