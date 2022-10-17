@@ -34,43 +34,45 @@ class Client(object):
         self.members = []
         self.timeout = 1.5  # seconds
 
-    def send_message(self, host, port, msg) -> str:
+    def join_group(self):
         """
-        Given host and port, returns msg rec'd from host. Handles
-        connection, no response, invalid format, and invalid msg with
-        error msgs to console.
-
-        :param host: IP/hostname
-        :param port: port number
-        :return:  message
+        Attempts to connect to GCD. If connect successful, sends JOIN message to GCD
+        and expects to receive dictionary of members and addresses. Then calls
+        meet_members. If connect unsuccessful or GCD response of wrong type, logs to
+        console.
         """
 
-        # create socket
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            # connect socket
-            s.settimeout(self.timeout)
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as gcd:
+            gcd_address = (self.host, self.port)
+            print('JOIN {}'.format(gcd_address))
+            gcd.settimeout(self.timeout)
             try:
-                s.connect((host, port))
-            except socket_error as serr:
-                print('failed to connect: {} %s' % serr)
-                return
-            s.sendall(pickle.dumps(msg))
-
-            # receive data
-            try:
-                pick_data = s.recv(self.buffer_size)
-            except socket_error as serr:
-                print('failed to return response: {} %s' % serr)
+                gcd.connect(gcd_address)
+            except socket_error as err:
+                print('failed to connect to gcd: {} &s' % err)
                 return
 
-            # handle neighbor response
-            try:
-                unpick_data = pickle.loads(pick_data)
-            except(pickle.PickleError, KeyError, EOFError):
-                unpick_data = 'error: ' + str(unpick_data)
+    @staticmethod
+    def send_message(sock, data, buffer_size=BUF_SZ):
+        """
+        Marshalls data and sends to given socket. Blocks waiting for response,
+        unmarshalls and returns response. If send fails, logs and returns
 
-        return unpick_data
+        :param sock: socket to send message and recv message on
+        :param data: data to send via message
+        :param buffer_size: num bytes in recv buffer
+        :return: message
+        """
 
+        # send pickled data on sock
+        try:
+            sock.sendall(pickle.dumps(data))
+        except socket_error as err:
+            print('failed to send msg to socket: {} &s' % err)
+            return
+
+        # recv response, unpickle, and return
+        return pickle.loads(sock.recv(buffer_size))
 
 if __name__ == '__main__':
 
@@ -81,12 +83,11 @@ if __name__ == '__main__':
     # handle invalid command line args
     if len(sys.argv) != 3:
         print("Usage: python client.py HOST PORT")
-        exit(1);
+        exit(1)
 
+    # store parameters needed to init Client object, then init
     HOST, GCD_PORT = sys.argv[1], int(sys.argv[2])
-
-    # init client
-    client = Client(BUF_SZ, TIMEOUT)
+    client = Client(HOST, GCD_PORT)
 
     # get valid gcd response or exit
     print(GCD_MSG + ' (' + str(HOST) + ', ' + str(GCD_PORT) + ')')
