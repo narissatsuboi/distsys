@@ -42,6 +42,7 @@ class Client(object):
         console.
         """
 
+        # establish connection w/ gcd
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as gcd:
             gcd_address = (self.host, self.port)
             print('JOIN {}'.format(gcd_address))
@@ -49,8 +50,31 @@ class Client(object):
             try:
                 gcd.connect(gcd_address)
             except socket_error as err:
-                print('failed to connect to gcd: {} &s' % err)
+                print('failed to connect to gcd: {}'.format(err))
                 return
+
+            # get members list from gcd
+            self.members = self.send_message(gcd, 'JOIN')
+
+    def connect_to_members(self):
+        """
+        Attempts to connect and send msg to all members in members list. Logs responses
+        and failures to connect.
+        """
+
+        for member in self.members:
+            print('HELLO to {}'.format(member))
+
+            # establish connection with member socket
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as node:
+                node.settimeout(self.timeout)
+                node_address = (member['host'], member['port'])
+                try:
+                    node.connect(node_address)
+                except socket_error as err:
+                    print('failed to connect to member: {}'.format(err))
+                else:
+                    print(self.send_message(node, 'HELLO'))
 
     @staticmethod
     def send_message(sock, data, buffer_size=BUF_SZ):
@@ -68,17 +92,15 @@ class Client(object):
         try:
             sock.sendall(pickle.dumps(data))
         except socket_error as err:
-            print('failed to send msg to socket: {} &s' % err)
+            print('failed to send msg to socket: {}'.format(err))
             return
 
         # recv response, unpickle, and return
         return pickle.loads(sock.recv(buffer_size))
 
+
 if __name__ == '__main__':
-
-    GCD_MSG = 'JOIN'  # only msg GCD will accept
-    NBR_MSG = 'HELLO'  # only msg neighbor clients will accept
-
+    print('\nRPC Client Program\n')
 
     # handle invalid command line args
     if len(sys.argv) != 3:
@@ -89,22 +111,10 @@ if __name__ == '__main__':
     HOST, GCD_PORT = sys.argv[1], int(sys.argv[2])
     client = Client(HOST, GCD_PORT)
 
-    # get valid gcd response or exit
-    print(GCD_MSG + ' (' + str(HOST) + ', ' + str(GCD_PORT) + ')')
-    gcd_response = client.send_message(HOST, GCD_PORT, GCD_MSG)
-    if type(gcd_response) is not list:
-        print(gcd_response)
-        sys.exit(1)
+    # attempt to join the group
+    client.join_group()
 
-    # print responses from neighbor nodes
-    for pair in gcd_response:
-        host, port = pair['host'], pair['port']
-        print('HELLO to ' + repr(pair))
-        neighbor_response = client.send_message(host, port, NBR_MSG)
-
-        # skip to next neighbor if no response
-        if neighbor_response is None:
-            continue
-        print(neighbor_response)
+    # attempt to reach the members in the group
+    client.connect_to_members()
 
     sys.exit(0)
