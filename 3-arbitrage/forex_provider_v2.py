@@ -150,7 +150,7 @@ if __name__ == '__main__':
     #     print('Pick your own port for testing!')
     #     print('Modify REQUEST_ADDRESS above to use localhost and some random port')
     #     exit(1)
-    print('\nForex Provider')
+    print('\n/// Forex Provider ///')
     print('Port: ', REQUEST_ADDRESS[1])
     print()
     fxp = ForexProvider(REQUEST_ADDRESS, TestPublisher)
