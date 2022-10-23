@@ -5,14 +5,18 @@ Bellman-Ford Implementation
 """
 
 import fxp_bytes_subscriber  # for data import
-
+from collections import defaultdict
 
 class BellmanFord(object):
 
     def __init__(self, data):
         self.graph = []
-        self.num_vertices = len(data)
+        self.num_vertices = len(data)  # TODO update as needed?
         self.exchange_dict = data  # nested dict representing vert : {edge to: dist, ...}
+        self.vertices = set(self.exchange_dict.keys())  # list of vertices in graph
+
+    def run(self):
+        self.populate_graph()
 
     # TODO maintain set of active vertices? does this come from the subscriber?
     def add_edge(self, start_vertex, end_vertex, edge_dist):
@@ -22,11 +26,6 @@ class BellmanFord(object):
         for start_vertex, other_vertices in self.exchange_dict.items():
             for end_vertex in other_vertices:
                 self.add_edge(start_vertex, end_vertex, other_vertices[end_vertex])
-
-        print(self.graph)
-
-    def run(self):
-        self.populate_graph()
 
     def printArr(self, dist):
         print('Vertex Distance from Source')
@@ -58,16 +57,37 @@ class BellmanFord(object):
 
         """
 
-    # list of vertices
-    # relax every node number of vertices - 1 times
+        # init distances from start_vertex to all others as inf
+        dist = {k: float('inf') for k in self.vertices}
+        dist[start_vertex] = 0
+
+        # relax all edges num_vertices - 1 times
+        for _ in range(self.num_vertices - 1):
+            for start_vertex, end_vertex, edge_distance in self.graph:
+                if dist[start_vertex] != float('inf') and dist[end_vertex] + \
+                        edge_distance < dist[end_vertex]:
+                    dist[end_vertex] = dist[start_vertex] + edge_distance
+
+        # check for negative cycles
+        for start_vertex, end_vertex, edge_distance in self.graph:
+            if dist[start_vertex] != float('inf') and dist[start_vertex] + \
+                    edge_distance < dist[end_vertex]:
+                print('Graph contains negative weight cycle')
+                return
+
+    # print(dist)
+
+
 
 if __name__ == '__main__':
     print('\n/// Belman Ford ///')
     exchanges = {
-                    'a': {'b': 1, 'c':5}, 'b': {'c': 2, 'a': 10},
+                    'a': {'b': 1, 'c': 5}, 'b': {'c': 2, 'a': 10},
                     'c': {'a': 14, 'd': -3}, 'e': {'a': -200}
                   }
 
     mybf = BellmanFord(exchanges)
     mybf.run()
-    mybf.print_graph()
+    print(mybf.graph)
+    mybf.shortest_paths('a')
+
