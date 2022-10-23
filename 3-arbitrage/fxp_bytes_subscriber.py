@@ -21,8 +21,10 @@ class ForexSubscriber(object):
     """
     Subscribes to ForexProvider object.
     """
-    BUF_SZ = 12
+    BUF_SZ = 50
     WAIT = 1.5
+    MAX_QUOTES = 50
+    QUOTE_SZ = 32  # b
 
     def __init__(self, host, port):
         """
@@ -63,6 +65,8 @@ class ForexSubscriber(object):
     def run_forever(self):
         self.subscribe()
         while True:
+            data, address = self.listener.recvfrom(self.MAX_QUOTES * self.QUOTE_SZ)
+            print(data)
             continue
 
 
