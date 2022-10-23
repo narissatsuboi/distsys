@@ -48,17 +48,18 @@ class ForexSubscriber(object):
         # set up listening server
         listener = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         listener.bind(('localhost', 0))  # use any free socket
-        print('start_a_server: udp listening socket up and running...')
+        print('>>> start_a_server: udp listening socket up and running...')
         return listener, listener.getsockname()
 
     def subscribe(self):
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as subscriber:
-            byte_ip = socket.inet_aton(self.host)
-            byte_port = socket.inet_aton(str(self.port))[2:]
+            byte_ip = socket.inet_aton(self.listener_address[0])
+            byte_port = socket.inet_aton(str(self.listener_address[1]))[2:]
             subscribe_msg = byte_ip + byte_port
             address = (self.host, self.port)
             subscriber.sendto(subscribe_msg, address)
-        print('subscribe: sent msg')
+        print('>>> subscribe: sent subscribe request')
+
     def run_forever(self):
         self.subscribe()
         while True:
@@ -78,5 +79,5 @@ if __name__ == '__main__':
     subscriber = ForexSubscriber(HOST, PORT)  # init subscriber
     print('Attempting to connect to Forex Publisher...')
     print('Host: {} Port: {}'.format(HOST, PORT))
+    print('Running Fortrex Subscriber...')
     subscriber.run_forever()
-
