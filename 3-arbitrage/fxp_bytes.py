@@ -37,7 +37,7 @@ def deserialize_address(b: bytes) -> (str, int):
     :return: ip address and port pair
     """
     ip = ipaddress.ip_address(b[0:4])
-    p = array('H')
+    p = array('H')  # type code unsigned short
     p.frombytes(b[4:6])
     p.byteswap()  # to big-endian
     return str(ip), p[0]
