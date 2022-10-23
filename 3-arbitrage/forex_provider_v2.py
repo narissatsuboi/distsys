@@ -114,9 +114,9 @@ class ForexProvider(object):
         :param publisher_class: publisher class must support publish and register_
         """
         self.selector = selectors.DefaultSelector()
-        self.subscription_requests = self.start_a_server(request_address)
+        self.subscription_requests = self.start_a_server(request_address)  # listener
         self.selector.register(self.subscription_requests, selectors.EVENT_READ)
-        self.publisher = publisher_class()
+        self.publisher = publisher_class()  # Test_Publisher instance
 
     def run_forever(self):
         print('waiting for subscribers on {}  - v2'.format(self.subscription_requests))
@@ -139,7 +139,7 @@ class ForexProvider(object):
 
         :returns: listening socket
         """
-        listener = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        listener = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # UDP/IP
         listener.bind(address)
         listener.settimeout(0.2)  # FIXME
         return listener
@@ -150,5 +150,8 @@ if __name__ == '__main__':
     #     print('Pick your own port for testing!')
     #     print('Modify REQUEST_ADDRESS above to use localhost and some random port')
     #     exit(1)
+    print('\nForex Provider')
+    print('Port: ', REQUEST_ADDRESS[1])
+    print()
     fxp = ForexProvider(REQUEST_ADDRESS, TestPublisher)
     fxp.run_forever()
