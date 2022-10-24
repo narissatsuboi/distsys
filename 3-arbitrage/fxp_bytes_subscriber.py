@@ -39,7 +39,9 @@ def deserialize_price(b: bytes) -> float:
 
 def serialize_address(address: tuple) -> bytes:
     """
-    Convert (str, int) tuple to 6 byte array.
+    Converts (str, int) tuple to 6 byte array. Format of the subscription request message
+    is 4-byte IPv4 address in big-endian (network format) followed by a 2-byte port number
+    also in big-endian.
 
     :param address: str, int tuple representing and ip and port
     :return: 6-bytes representing ip and port
@@ -47,9 +49,8 @@ def serialize_address(address: tuple) -> bytes:
 
     byte_ip = socket.inet_aton(address[0])
     byte_port = socket.inet_aton(str(address[1]))[2:]
-    msg = byte_ip + byte_port
 
-    return msg
+    return byte_ip + byte_port
 
 
 if __name__ == '__main__':
