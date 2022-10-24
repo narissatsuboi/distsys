@@ -13,7 +13,7 @@ Python Arrays for byte manip https://docs.python.org/3/library/array.html
 
 import fxp_bytes as fxp
 
-import ipaddress
+from ipaddress import ip_address
 import socket
 import sys
 from array import array
@@ -37,9 +37,20 @@ def deserialize_price(b: bytes) -> float:
     return price[0]
 
 
+def serialize_address(address: tuple) -> bytes:
+    """
+    Convert (str, int) tuple to 6 byte array.
+
+    :param address: str, int tuple representing and ip and port
+    :return: 6-bytes representing ip and port
+    """
+
+    byte_ip = socket.inet_aton(address[0])
+    byte_port = socket.inet_aton(str(address[1]))[2:]
+    msg = byte_ip + byte_port
+
+    return msg
+
+
 if __name__ == '__main__':
     print('')
-    price = 9006104071832581.0
-    # print(price)
-    arr = fxp.serialize_price(price)
-    print(deserialize_price(arr))

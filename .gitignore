@@ -1,2 +1,9 @@
 # ignore idea
 .idea/
+__pycache__/
+*.txt
+1-simpleclient/client/test_client.py
+2-bully/lab2/test_lab2.py
+2-bully/selectors/server.py
+2-bully/selectors/client.py
+2-bully/lab2/test_lab2.py

@@ -3,11 +3,12 @@ CPSC 5520, Seattle University
 This is free and unencumbered software released into the public domain.
 :Authors: Narissa Tsuboi
 :Version: 1
-:brief: Testing file for lab2.py
+:brief: Testing file for lab2
 """
 
 import unittest
-from lab2 import Lab2
+from bully import Bully
+from gcd2 import GroupCoordinatorDaemon
 
 GCD_ADDRESS = ('127.0.0.1', '22')
 NEXT_BIRTHDAY = '2023-06-28'
@@ -16,10 +17,9 @@ SUID = 123456
 
 class TestLab2(unittest.TestCase):
 
-
     def setUp(self):
         #print('setUp')
-        self.node = Lab2(GCD_ADDRESS, NEXT_BIRTHDAY, SUID)
+        self.node = Bully(GCD_ADDRESS, NEXT_BIRTHDAY, SUID)
 
     def tearDown(self):
         #print('tearDown')

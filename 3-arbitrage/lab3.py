@@ -9,6 +9,7 @@ Reference:
 """
 
 import socket
+import time
 from datetime import datetime
 import sys
 from bellman_ford import BellmanFord
@@ -80,13 +81,11 @@ class Lab3(object):
         QUOTE_SZ = 32  # b
 
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as subscriber:
-            byte_ip = socket.inet_aton(self.listener_address[0])
-            byte_port = socket.inet_aton(str(self.listener_address[1]))[2:]
-            subscribe_msg = byte_ip + byte_port
-            address = (self.host, self.port)
-            subscriber.sendto(subscribe_msg, address)
-        print('>>> subscribe: sent subscribe request')
-        pass
+            subscribe_msg = fxp_bytes_subscriber.serialize_address(self.listener_address)
+            subscriber.sendto(subscribe_msg, self.provider)
+
+        # renew subscription again
+        time.sleep(self.SUBSCRIPTION_TIME)
 
     def run(self):
         """
@@ -97,6 +96,7 @@ class Lab3(object):
         self.start_listener()
 
         # attempt to subscribe
+        self.subscribe()
 
 
 if __name__ == '__main__':
