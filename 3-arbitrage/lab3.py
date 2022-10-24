@@ -1,5 +1,5 @@
 """
-Lab 3 Arbitrage Detectror
+Lab 3 Arbitrage Detector (aka forex_subscriber)
 :authors: Narissa Tsuboi
 :version: 1
 :brief:
