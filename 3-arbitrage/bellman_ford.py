@@ -35,7 +35,7 @@ class BellmanFord(object):
         # take the negative log of the exchange rate per BF algorithm
         edge_dist = -1 * log(edge_dist)
 
-        # add new data point to graph 
+        # add new data point to graph
         self.graph.append([start_vertex, end_vertex, edge_dist])
 
     def populate_graph(self):

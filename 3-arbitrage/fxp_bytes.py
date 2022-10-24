@@ -19,10 +19,11 @@ def serialize_price(x: float) -> bytes:
     >>> serialize_price(9006104071832581.0)  # that's 0504030201ff3f43 in hex on a little-endian ieee754 machine
     b'\\x05\\x04\\x03\\x02\\x01\\xff?C'
 
-    :param x: number to be converted
+    :param x: 64 bit floating point number to be converted
     :return: bytes suitable to to be sent in a Forex Provider message
     """
     a = array('d', [x])  # array of 8-byte floating-point numbers
+    print(a)
     return a.tobytes()
 
 

@@ -2,10 +2,17 @@
 Forex Subscriber
 :authors: Narissa Tsuboi
 :version: 1
-:brief: Subscriber side class for Forex Provider, a 3rd party vendor that publishes
-currency exchange rates via UDP IP socket in the form of a byte array.
-Reference: test publisher  forex_provider_v2.py
+:brief: Subscriber utility class for Forex Subscriber (Lab3.py). Utility functions
+mirror the serialize and deserialize utility functions for the corresponding provider
+class forex_provider_v2.py.
+
+References:
+Python Arrays for byte manip https://docs.python.org/3/library/array.html
+
 """
+
+import fxp_bytes as fxp
+
 import ipaddress
 import socket
 import sys
@@ -17,71 +24,22 @@ Format of the subscription request message is 4-byte IPv4 address in big-endian
 """
 
 
-class ForexSubscriber(object):
+def deserialize_price(b: bytes) -> float:
     """
-    Subscribes to ForexProvider object.
+    Convert a byte array representing a price to float.
+
+    :param b: 8-byte array of floating point numbers
+    :return: float representation of b
     """
-    BUF_SZ = 50
-    WAIT = 1.5
-    MAX_QUOTES = 50
-    QUOTE_SZ = 32  # b
 
-    def __init__(self, host, port):
-        """
-        Instantiates a ForexSubscriber object used to subscribe to a ForexPublisher.
-        :param host: ForexSubscriber host address
-        :param port: ForexSubscriber port number
-        """
-
-        # rename local host to its ip representation
-        if host == 'localhost':
-            host = '127.0.0.1'
-        self.host, self.port = host, int(port)
-        self.listener, self.listener_address = self.start_a_server()
-
-    @staticmethod
-    def start_a_server():
-        """
-        Opens a listening socket to handle publish msgs rec'd from
-        ForexPublisher.
-
-        :return: listener socket and address
-        """
-        # set up listening server
-        listener = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        listener.bind(('localhost', 0))  # use any free socket
-        print('>>> start_a_server: udp listening socket up and running...')
-        return listener, listener.getsockname()
-
-    def subscribe(self):
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as subscriber:
-            byte_ip = socket.inet_aton(self.listener_address[0])
-            byte_port = socket.inet_aton(str(self.listener_address[1]))[2:]
-            subscribe_msg = byte_ip + byte_port
-            address = (self.host, self.port)
-            subscriber.sendto(subscribe_msg, address)
-        print('>>> subscribe: sent subscribe request')
-
-    def run_forever(self):
-        self.subscribe()
-        while True:
-            data, address = self.listener.recvfrom(self.MAX_QUOTES * self.QUOTE_SZ)
-            print(data)
-            continue
+    price = array('d')  # init new array, of type 'd' float
+    price.frombytes(b)  # fill with decoded float val eg array([9006104071832581.0])
+    return price[0]
 
 
 if __name__ == '__main__':
-    print('\n/// Forex Subscriber ///')
-
-    # print usage if invalid command line args
-    if len(sys.argv) != 3:
-        print('Usage: python fxp_bytes_subscriber.py host port')
-        exit(1)
-
-    # attempt to connect to publisher
-    HOST, PORT = sys.argv[1], sys.argv[2]
-    subscriber = ForexSubscriber(HOST, PORT)  # init subscriber
-    print('Attempting to connect to Forex Publisher...')
-    print('Host: {} Port: {}'.format(HOST, PORT))
-    print('Running Fortrex Subscriber...')
-    subscriber.run_forever()
+    print('')
+    price = 9006104071832581.0
+    # print(price)
+    arr = fxp.serialize_price(price)
+    print(deserialize_price(arr))
