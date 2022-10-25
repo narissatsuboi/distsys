@@ -6,13 +6,14 @@ This module implements a staging version the Forex Provider price feed on localh
 """
 import socket
 import selectors
+import sys
 from datetime import datetime, timedelta
 import time
 import random
 import fxp_bytes
 
 
-REQUEST_ADDRESS = ('localhost', 50403)
+REQUEST_ADDRESS = ('localhost', 50409)
 REQUEST_SIZE = 12
 REVERSE_QUOTED = {'GBP', 'EUR', 'AUD'}
 SUBSCRIPTION_TIME = 19  # 10 * 60  # seconds
@@ -47,6 +48,7 @@ class TestPublisher(object):
     def publish(self):
         # remove expired subscriptions
         ts = datetime.utcnow()
+        print(ts)
         for subscriber in set(self.subscriptions):
             if (ts - self.subscriptions[subscriber]).total_seconds() >= SUBSCRIPTION_TIME:
                 print('{} subscription expired'.format(subscriber))
@@ -114,18 +116,26 @@ class ForexProvider(object):
         :param publisher_class: publisher class must support publish and register_
         """
         self.selector = selectors.DefaultSelector()
-        self.subscription_requests = self.start_a_server(request_address)  # listener
+        self.subscription_requests = self.start_a_server(request_address)
         self.selector.register(self.subscription_requests, selectors.EVENT_READ)
-        self.publisher = publisher_class()  # Test_Publisher instance
+        self.publisher = publisher_class()
 
     def run_forever(self):
         print('waiting for subscribers on {}  - v2'.format(self.subscription_requests))
         next_timeout = 0.2  # FIXME
-        while True:
+        # while True:
+        #     events = self.selector.select(next_timeout)
+        #     for key, mask in events:
+        #         self.register_subscription()
+        #     next_timeout = self.publisher.publish()
+
+        end = time.time() + 20
+        while time.time() < end:
             events = self.selector.select(next_timeout)
             for key, mask in events:
                 self.register_subscription()
             next_timeout = self.publisher.publish()
+        return
 
     def register_subscription(self):
         data, _address = self.subscription_requests.recvfrom(REQUEST_SIZE)
@@ -139,7 +149,7 @@ class ForexProvider(object):
 
         :returns: listening socket
         """
-        listener = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # UDP/IP
+        listener = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         listener.bind(address)
         listener.settimeout(0.2)  # FIXME
         return listener
@@ -150,8 +160,6 @@ if __name__ == '__main__':
     #     print('Pick your own port for testing!')
     #     print('Modify REQUEST_ADDRESS above to use localhost and some random port')
     #     exit(1)
-    print('\n/// Forex Provider ///')
-    print('Port: ', REQUEST_ADDRESS[1])
-    print()
     fxp = ForexProvider(REQUEST_ADDRESS, TestPublisher)
     fxp.run_forever()
+    sys.exit(0)

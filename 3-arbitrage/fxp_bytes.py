@@ -23,7 +23,6 @@ def serialize_price(x: float) -> bytes:
     :return: bytes suitable to be sent in a Forex Provider message
     """
     a = array('d', [x])  # array of 8-byte floating-point numbers
-    print(a)
     return a.tobytes()
 
 

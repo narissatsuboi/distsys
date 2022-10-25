@@ -1,0 +1,146 @@
+"""
+Lab 3 Arbitrage Detector (aka forex_subscriber)
+:authors: Narissa Tsuboi
+:version: 1
+:brief:
+
+provider represents publisher in the sub/pub algorithm
+References
+
+https://docs.python.org/3/library/threading.html for threaded processes
+"""
+
+import socket
+import time
+from datetime import datetime
+import sys
+from bellman_ford import BellmanFord
+import fxp_bytes_subscriber
+import fxp_bytes
+import threading
+
+
+class Lab3(object):
+    # Global vars per spec
+    MSG_BUFFER = 0.1  # 100ms
+    SUBSCRIPTION_TIME = 19  # 10 * 60  # seconds
+    USD_TRADE_VAL = 100  # Assume USD is always 100
+
+    def __init__(self, provider):
+        """ Instantiates a Lab3 object representing a subscriber. Starts and stores its
+        listening socket.
+
+        :param provider: (host, port) of the quote provider
+        """
+
+        # represents bellman ford exploration space
+        self.graph = {}
+
+        # assumes subscriber always starts on local host
+        self.listener_address = (socket.gethostbyname('localhost'), 0)
+
+        # store provider socket info
+        self.provider = (socket.gethostbyname(provider[0]), int(provider[1]))
+        self.provider_address, self.provider_port = self.provider[0], self.provider[1]
+
+    def handle_stream(self):
+        """
+
+        """
+
+        BUF_SZ = 4096
+        TIMESTAMP, CROSS, PRICE = 'timestamp', 'cross', 'price'
+
+        print('started handle stream loop')
+
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as listener:
+            listener.bind(('localhost', 0))
+            print('\nblocking, waiting to receive message')
+
+            # assign current time
+            previous_time = (datetime.utcnow() - datetime.now()) + datetime.now()
+            print('previous time', previous_time)
+
+            while True:
+                b_provider_msg, _addr = listener.recvfrom(4000)
+                print(b_provider_msg)
+
+                # quote_list = fxp_bytes_subscriber.unmarshall_msg(b_provider_msg)
+                #
+                # # handle each quote in the quote list (list of dicts, ea dict is a quote)
+                # for quote in quote_list:
+                #     print(quote)
+                #     # get timestamp from quote and calc the time difference since last msg
+                #     this_msg_time = quote[TIMESTAMP]
+                #     last_msg_time = (previous_time - this_msg_time).total_seconds()
+                #
+                #     # TODO ignore any quotes with timestamps before the latest one seen for
+                #     #  that market
+                #
+                #     # ignore  quotes with time stamps that are older than 1/2 second since
+                #     # the previous quote time
+                #
+                #     print('this msg time', this_msg_time)
+                #     # if this_msg_time.total_seconds() < (previous_time.total_seconds) + 0.5:
+                #     #     continue
+                #     # else:
+                #     print('out of order msg skipped ')
+
+    def subscribe(self):
+        """
+        Pings subscriber with subscription message. New socket created and closed for
+        each message. Waits to send next message after 'SUBSCRIPTION_TIME'.
+        """
+
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as subscriber:
+            subscribe_msg = fxp_bytes_subscriber.serialize_address(self.listener_address)
+            subscriber.sendto(subscribe_msg, self.provider)
+            print('subscribe: sent subscribe message to pub')
+
+    def remove_stale_rates(self):
+        """
+        Remove exchage rates that have been in the graph for longer than the staleness
+        limit
+
+        :return: number of rates that were removed for being stale
+        """
+
+        STALENESS_TIMEOUT = 1.5  # Threshold for an old quote
+        pass
+
+    def run(self):
+        """
+
+        """
+
+        # attempt to subscribe
+        self.subscribe()
+
+        # start handling incoming msgs
+        self.handle_stream()
+
+
+        # TODO shutdown after 10 minutes
+
+    @staticmethod
+    def log_quotes():
+        """
+        Prints a quote in the following format:
+        'YEAR-MO-DAY HR:MI:SE CROSS1 CROSS2 RATE'
+        """
+        pass
+
+
+if __name__ == '__main__':
+    print('\n/// Forex Subscriber ///')
+
+    # print usage if invalid command line args
+    if len(sys.argv) != 3:
+        print('Usage: python fxp_bytes_subscriber.py host port')
+        exit(1)
+
+    # init subscriber object
+    subscriber = Lab3((sys.argv[1], sys.argv[2]))
+
+    # run subscriber object
+    subscriber.run()

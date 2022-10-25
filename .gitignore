@@ -7,3 +7,8 @@ __pycache__/
 2-bully/selectors/server.py
 2-bully/selectors/client.py
 2-bully/lab2/test_lab2.py
+udpcliserv/client.py
+udpcliserv/serv.py
+3-arbitrage/BDT.py
+3-arbitrage/pub.sh
+3-arbitrage/sub.sh

@@ -11,13 +11,9 @@ Python Arrays for byte manip https://docs.python.org/3/library/array.html
 
 """
 
-import fxp_bytes as fxp
-
-from ipaddress import ip_address
-import socket
-import sys
-from array import array
 import datetime
+import socket
+from array import array
 from datetime import datetime
 
 
@@ -74,20 +70,10 @@ def deserialize_datetime(b: bytes) -> datetime:
     MICROS_PER_SEC = 1e+6
 
     dt = array('L')  # store bits in long array
-    dt.frombytes(b)  # fill array
-    dt.byteswap()  # big to little endian
+    ms = int.from_bytes(b, byteorder='big')  # fill array
+    epoch = datetime(1970, 1, 1)
 
-    print('dt[0', dt[0])
-    # calculate the UTC time
-    timestamp_in_micro = dt[0] / MICROS_PER_SEC  # convert from sec to microsec
-
-    # timestamp_in_micro = dt[0] / 1e+6  # convert from sec to microsec
-    print('timestamp in micro', timestamp_in_micro)
-    # calculate the microsecs from timestamp to now
-
-    # TODO convert to timedelta calc instead
-    return datetime.fromtimestamp(timestamp_in_micro) + (datetime.utcnow() -
-                                                         datetime.now())
+    return epoch + datetime.timedelta(seconds=ms / MICROS_PER_SEC)
 
 
 def unmarshall_msg(b: bytes) -> list:
@@ -106,7 +92,7 @@ def unmarshall_msg(b: bytes) -> list:
     """
     TIMESTAMP, CROSS, PRICE = 'timestamp', 'cross', 'price'
 
-    MSG_SZ = 32      # per spec, each quote is no more than 32 bytes
+    MSG_SZ = 32  # per spec, each quote is no more than 32 bytes
     quote_list = []  # holds unmarshalled list of dictionaries representing quotes
 
     # calculate the total number of quotes contained in the UDP byte array
@@ -134,4 +120,6 @@ def unmarshall_msg(b: bytes) -> list:
 
 
 if __name__ == '__main__':
-    print()
+    address = ('127.0.0.1', 0)
+    ser_address = serialize_address(address)
+    print(ser_address)
