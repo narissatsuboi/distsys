@@ -10,4 +10,7 @@ Client connects to a Group Coordinator Daemon (GCD) which responds with a list o
 This project is an implementation of the Bully Algorithm, a method for asynchronously electing a leader node within a group of distributed processes ([Source: Wikipedia](https://en.wikipedia.org/wiki/Bully_algorithm)). The node attempts to reach consensus of who is the bully (leader) using asynch socket programming.
 
 ### 3. Detecting Arbitrage Opportunities Using Published Quotes (Pub/Sub) 
-(In progress) A process that listens to currency exchange rates from a price feed and prints out a message whenver there is an arbitrage opportunity available. 
+A process that listens to currency exchange rates from a price feed and prints out a message whenever there is an arbitrage opportunity available. 
+
+### 4. Chord Implementation of Distributed Hash Table 
+(in progress)
