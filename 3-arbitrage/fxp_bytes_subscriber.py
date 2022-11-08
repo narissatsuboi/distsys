@@ -8,13 +8,12 @@ class forex_provider_v2.py.
 
 References:
 Python Arrays for byte manip https://docs.python.org/3/library/array.html
-
 """
 
 import datetime
 import socket
 from array import array
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 def deserialize_price(b: bytes) -> float:
@@ -73,7 +72,7 @@ def deserialize_datetime(b: bytes) -> datetime:
     ms = int.from_bytes(b, byteorder='big')  # fill array
     epoch = datetime(1970, 1, 1)
 
-    return epoch + datetime.timedelta(seconds=ms / MICROS_PER_SEC)
+    return epoch + timedelta(seconds=ms / MICROS_PER_SEC)
 
 
 def unmarshall_msg(b: bytes) -> list:

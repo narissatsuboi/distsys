@@ -5,29 +5,22 @@ Bellman-Ford Implementation
 """
 from math import log
 
+# commonly used dict keys
+TIMESTAMP, CROSS, PRICE = 'timestamp', 'cross', 'price'
+
 
 class BellmanFord(object):
 
-    def __init__(self, data):
+    def __init__(self, graph):
         """ Inits a new instance of the Bellman Ford algorithm on data passed in thru
         the object constructor.
         """
-        # nested dict vert : {edge to: dist, ...}
-        self.exchange_dict = data
-
-        # list of vertices in graph
-        self.vertices = set(self.exchange_dict.keys())
-
         # holds vertex lists representing analysis space
-        self.graph = []
+        self.graph = graph
 
         # holds the current number of distinct vertices
-        self.num_vertices = len(data)
+        self.num_vertices = len(graph)
 
-    def run(self):
-        self.populate_graph()
-
-    # TODO maintain set of active vertices? does this come from the subscriber?
     def add_edge(self, start_vertex, end_vertex, edge_dist):
         """
 
@@ -37,16 +30,6 @@ class BellmanFord(object):
 
         # add new data point to graph
         self.graph.append([start_vertex, end_vertex, edge_dist])
-
-    def populate_graph(self):
-        """ Appends vertices and their edge information to the graph list. Per Bellman
-        Floyd algorithm for arbitrage implementation, takes the negative log of each
-        currency prior to adding to the graph.
-        """
-        for start_vertex, other_vertices in self.exchange_dict.items():
-            for end_vertex in other_vertices:
-                # add new edge to graph
-                self.add_edge(start_vertex, end_vertex, other_vertices[end_vertex])
 
     def printArr(self, dist):
         print('Vertex Distance from Source')
@@ -79,37 +62,33 @@ class BellmanFord(object):
         """
 
         INF = float('inf')
-        neg_edge = None
 
         # init distances from start_vertex to all others as inf
-        dist = {k: INF for k in self.vertices}
+        dist = {k: INF for k in self.graph}
         dist[start_vertex] = 0
+        prev = {k: None for k in self.graph}
 
         # relax all edges num_vertices - 1 times
-        for _ in range(self.num_vertices - 1):
-            for start_vertex, end_vertex, edge_distance in self.graph:
-                if dist[start_vertex] != INF and dist[end_vertex] + \
-                        edge_distance < dist[end_vertex]:
-                    dist[end_vertex] = dist[start_vertex] + edge_distance
+        for i in range(self.num_vertices - 1):
+            for currency_a in self.graph:
+                for currency_b in self.graph[currency_a]:
+                    edge_wt = self.graph[currency_a][currency_b][PRICE]
+                    # print(currency_a, currency_b, edge_wt)
 
-        # check for negative cycles
-        for start_vertex, end_vertex, edge_distance in self.graph:
-            if dist[start_vertex] != INF and dist[start_vertex] + \
-                    edge_distance < dist[end_vertex]:
-                print('Graph contains negative weight cycle')
-                neg_edge = (start_vertex, end_vertex)
+                    # update the dist between currencies if the path is shorter
+                    if dist[currency_a] is not INF:
+                        if (tolerance + dist[currency_a] + edge_wt < dist[currency_b]) \
+                                and (dist[currency_a] + edge_wt - tolerance < dist[
+                            currency_b]):
+                            dist[currency_b] = dist[currency_a] + edge_wt
+                            prev[currency_b] = currency_a
 
-        return neg_edge
+        for currency_a in self.graph:
+            for currency_b in self.graph[currency_a]:
+                edge_wt = self.graph[currency_a][currency_b][PRICE]
+                if (tolerance + dist[currency_a] + edge_wt < dist[currency_b]) \
+                        and (dist[currency_a] + edge_wt - tolerance < dist[currency_b]):
+                    return dist, prev, (currency_a, currency_b)
 
+        return dist, prev, None
 
-if __name__ == '__main__':
-    print('\n/// Belman Ford ///')
-    exchanges = {
-        'a': {'b': 1, 'c': 5}, 'b': {'c': 2, 'a': 10},
-        'c': {'a': 14, 'd': 3}, 'e': {'a': 200}
-    }
-
-    mybf = BellmanFord(exchanges)
-    mybf.run()
-    print(mybf.graph)
-    mybf.shortest_paths('a')
