@@ -134,19 +134,57 @@ class FingerEntry(object):
         return id in self.interval
 
 
-
-
 # chord node class
 class ChordNode(object):
     def __init__(self, n):
-        self.port = n
+        global TEST_BASE
+
+        # networking init
+        self.port = n + TEST_BASE
+        TEST_BASE += 1
+        self.addr = (socket.gethostbyname('localhost'), self.port)
+
+        # node prop init
         self.node_id = self.get_node_hash(n)
         # self.finger = [None] + [FingerEntry(n, k) for k in range(1, M+1)]  # indexing starts at 1
         # self.predecessor = None
         # self.keys = {}
+
+
         # log
         print('chordnod: Created new ChordNode on port {} w/ id {}'.format(self.port,
-                                                                           self.node_id))
+                                                                         self.node_id))
+
+    def dispatch_rpc(self, method, arg1, arg2):  # server side
+        """
+
+        :param method:
+        :param arg1:
+        :param arg2:
+        :return:
+        """
+
+
+    def handle_rpc(self, client):  # server side
+        """Unmarshalls msg from client, routes request to dispatch_rpc, waits
+        for result and sends back to client."""
+        rpc = client.recv(BUF_SZ)
+        method, arg1, arg2 = pickle.loads(rpc)
+        result = self.dispatch_rpc(method, arg1, arg2)
+        client.sendall(pickle.dumps(result))
+
+
+    def start_server(self):  # server side 
+        """Starts threaded listening server to handle incoming requests"""
+
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
+            server.bind(self.addr)
+            server.listen(BACKLOG)
+        while True:
+            client, client_addr = server.accept()
+            threading.Thread(target=self.handle_rpc, args=(client,)).start()
+
+
 
     @staticmethod
     def get_node_hash(n):
@@ -154,7 +192,6 @@ class ChordNode(object):
         :return: hashed node id
         """
         return hashlib.sha1((socket.gethostbyname('localhost') + str(n)).encode()).digest()
-
 
     # @property
     # def successor(self):
