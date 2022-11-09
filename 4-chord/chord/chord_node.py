@@ -11,6 +11,7 @@ import array      # to encode prior to hash
 import hashlib    # for consistent hashing with SHA-1
 import pickle     # for marshalling and unmarshalling
 import socket     # for rpc calls
+import string
 import sys
 import threading  # to prevent deadlock
 
@@ -138,10 +139,23 @@ class FingerEntry(object):
 # chord node class
 class ChordNode(object):
     def __init__(self, n):
-        self.node_id = n
+        self.port = n
+        self.node_id = self.get_node_hash(n)
         # self.finger = [None] + [FingerEntry(n, k) for k in range(1, M+1)]  # indexing starts at 1
         # self.predecessor = None
         # self.keys = {}
+        # log
+        print('chordnod: Created new ChordNode on port {} w/ id {}'.format(self.port,
+                                                                           self.node_id))
+
+    @staticmethod
+    def get_node_hash(n):
+        """ Creates the node id by hashing the endpoint and port using SHA1 per spec.
+        :return: hashed node id
+        """
+        return hashlib.sha1((socket.gethostbyname('localhost') + str(n)).encode()).digest()
+
+
     # @property
     # def successor(self):
     #     return self.finger[1].node_id
@@ -175,7 +189,6 @@ if __name__ == '__main__':
     port = int(sys.argv[1])  # todo update to endpoint IP + port
     # create new node
     node = ChordNode(port)
-    print('Created new ChordNode on port {}'.format(port))
 
     # TODO join existing chord
     # if port != 0:
