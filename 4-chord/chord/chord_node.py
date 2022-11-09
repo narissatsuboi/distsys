@@ -130,9 +130,27 @@ class FingerEntry(object):
     def __contains__(self, id):
         """ Is the given id within this finger's interval? """
         return id in self.interval
-    
-# chord node class
 
+# chord node class
+class ChordNode(object):
+    def __init__(self, n):
+        self.node = n
+        self.finger = [None] + [FingerEntry(n, k) for k in range(1, M+1)]  # indexing starts at 1
+        self.predecessor = None
+        self.keys = {}
+
+    @property
+    def successor(self):
+        return self.finger[1].node
+
+    @successor.setter
+    def successor(self, id):
+        self.finger[1].node = id
+
+    def find_successor(self, id):
+        """ Ask this node to find id's successor = successor(predecessor(id))"""
+        np = self.find_predecessor(id)
+        return self.call_rpc(np, 'successor')
 
 if __name__ == '__main__':
     print('chord_node.py')
