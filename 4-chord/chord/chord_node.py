@@ -135,9 +135,9 @@ class FingerEntry(object):
 class ChordNode(object):
     def __init__(self, n):
         self.node = n
-        self.finger = [None] + [FingerEntry(n, k) for k in range(1, M+1)]  # indexing starts at 1
-        self.predecessor = None
-        self.keys = {}
+        # self.finger = [None] + [FingerEntry(n, k) for k in range(1, M+1)]  # indexing starts at 1
+        # self.predecessor = None
+        # self.keys = {}
 
     @property
     def successor(self):
@@ -152,8 +152,16 @@ class ChordNode(object):
         np = self.find_predecessor(id)
         return self.call_rpc(np, 'successor')
 
+    # TODO
+    def find_predecessor(self, id):
+        pass
+
+    # TODO
+    def call_rpc(self, np, param):
+        pass
+
 if __name__ == '__main__':
-    print('chord_node.py')
+    # print('chord_node.py')
     if len(sys.argv) != 2:
         print('Usage to start new node in new network: ')
         print('python chord_node.py 0')
@@ -161,11 +169,10 @@ if __name__ == '__main__':
         print('Usage to join new node to existing network: ')
         print('python chord_node.py [port of existing node]')
 
-
-    port = int(sys.argv[2])  # todo update to endpoint IP + port
+    port = int(sys.argv[1])  # todo update to endpoint IP + port
     # create new node
     node = ChordNode(port)
-    print('Created new ChordNode {}'.format(port))
+    print('Created new ChordNode on port {}'.format(port))
 
     # TODO join existing chord
     # if port != 0:
