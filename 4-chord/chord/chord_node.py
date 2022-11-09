@@ -150,6 +150,9 @@ class ChordNode(object):
         # self.predecessor = None
         # self.keys = {}
 
+        # threading start
+        listening_thread = threading.Thread(target=self.listen_thread(), args=(self.addr))
+        listening_thread.start()
 
         # log
         print('chordnod: Created new ChordNode on port {} w/ id {}'.format(self.port,
@@ -173,13 +176,20 @@ class ChordNode(object):
         result = self.dispatch_rpc(method, arg1, arg2)
         client.sendall(pickle.dumps(result))
 
-
-    def start_server(self):  # server side 
+    def listen_thread(self):  # server side
         """Starts threaded listening server to handle incoming requests"""
 
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
-            server.bind(self.addr)
-            server.listen(BACKLOG)
+        # with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
+        #     server.setblocking(False)
+        #     server.bind(self.addr)
+        #     server.listen(BACKLOG)
+        #     while True:
+        #         client, client_addr = server.accept()
+        #         threading.Thread(target=self.handle_rpc, args=(client,)).start()
+
+        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server.bind(self.addr)
+        server.listen(BACKLOG)
         while True:
             client, client_addr = server.accept()
             threading.Thread(target=self.handle_rpc, args=(client,)).start()
@@ -213,6 +223,7 @@ class ChordNode(object):
     # # TODO
     # def call_rpc(self, np, param):
     #     pass
+
 
 if __name__ == '__main__':
     # print('chord_node.py')
