@@ -7,21 +7,22 @@ connections (other nodes or queriers). You can use blocking TCP for this and pic
 the marshaling.
 """
 
-import array      # to encode prior to hash
-import hashlib    # for consistent hashing with SHA-1
-import pickle     # for marshalling and unmarshalling
-import socket     # for rpc calls
+import array  # to encode prior to hash
+import hashlib  # for consistent hashing with SHA-1
+import pickle  # for marshalling and unmarshalling
+import socket  # for rpc calls
 import string
 import sys
 import threading  # to prevent deadlock
 
 # globals
 
-M = 3              # TODO: Test size, normally hashlib.sha1().digest_size * 8
-NODES = 2**M       # size of the chord, tot num nodes possible
-BUF_SZ = 4096      # socket recv arg
-BACKLOG = 100      # socket listen arg
-TEST_BASE = 43544  # for testing use port numbers on localhost at TEST_BASE + n
+M = 4  # TODO: Test size, normally hashlib.sha1().digest_size * 8
+NODES = 2 ** M  # size of the chord, tot num nodes possible
+BUF_SZ = 4096  # socket recv arg
+BACKLOG = 100  # socket listen arg
+TEST_BASE = 43543  # for testing use port numbers on localhost at TEST_BASE + n
+
 
 # modrange and modrangeiter helper classes
 class ModRange(object):
@@ -79,6 +80,7 @@ class ModRange(object):
 
 class ModRangeIter(object):
     """ Iterator class for ModRange """
+
     def __init__(self, mr, i, j):
         self.mr, self.i, self.j = mr, i, j
 
@@ -95,6 +97,8 @@ class ModRangeIter(object):
         else:
             self.j += 1
         return self.mr.intervals[self.i][self.j]
+
+
 # finger table class
 class FingerEntry(object):
     """
@@ -134,17 +138,23 @@ class FingerEntry(object):
         return id in self.interval
 
 
-# chord node class
+POSSIBLE_HOSTS = ['127.0.01']
+POSSIBLE_PORTS = [43544, 43545, 43546, 43547]
+
+
 class ChordNode(object):
+    # node ip lookup, see lookup_node(n)
+    node_map = None
+
     def __init__(self, n):
         global TEST_BASE
 
-        # networking init
+        # easy access node info
         self.port = n
-        self.addr = (socket.gethostbyname('localhost'), self.port)
+        self.addr = ('127.0.01', n)
+        self.node_id = self.lookup_node(self.addr)
 
         # node prop init
-        self.node_id = self.get_node_hash(n)
         # self.finger = [None] + [FingerEntry(n, k) for k in range(1, M+1)]  # indexing starts at 1
         # self.predecessor = None
         # self.keys = {}
@@ -155,16 +165,39 @@ class ChordNode(object):
 
         # log
         print('chordnod: Created new ChordNode on port {} w/ id {}'.format(self.port,
-                                                                         self.node_id))
-
-    ###### start chord algo methods
+                                                                           self.node_id))
 
     @staticmethod
-    def get_node_hash(n):
+    def hash_node(host, port):
         """ Creates the node id by hashing the endpoint and port using SHA1 per spec.
         :return: hashed node id
         """
-        return hashlib.sha1((socket.gethostbyname('localhost') + str(n)).encode()).digest()
+        addr = str(host) + str(port)
+        digest = hashlib.sha1(addr.encode()).hexdigest()
+        digest = int(digest, 16) % pow(2, M)
+        return digest
+
+    @staticmethod
+    def lookup_node(this_addr=None, n=None):
+        # generate precomputed map {node_ids : addr ...}
+        if ChordNode.node_map is None:
+            nm = {}
+            for host in POSSIBLE_HOSTS:
+                host = host
+                for port in POSSIBLE_PORTS:
+                    addr = (host, port)
+                    n = ChordNode.hash_node(host, port)
+                    # get this node's id
+                    if this_addr and addr == this_addr:
+                        return n
+                    if n in nm:
+                        print('cannot use', addr, 'hash conflict', n)
+                    else:
+                        nm[n] = addr
+            ChordNode.node_map = nm
+        # fetch addr off other node
+        # lookup in precomputed table
+        return ChordNode.node_map[n]
 
     @property
     def successor(self):
@@ -181,6 +214,10 @@ class ChordNode(object):
 
     # TODO
     def find_predecessor(self, id):
+        pass
+
+
+    def join_chord(self):
         pass
 
     ###### end chord algo methods
@@ -229,7 +266,6 @@ class ChordNode(object):
     ###### end networking rpc methods
 
 
-
 if __name__ == '__main__':
     # print('chord_node.py')
     if len(sys.argv) != 2:
@@ -242,9 +278,10 @@ if __name__ == '__main__':
     port = int(sys.argv[1])  # todo update to endpoint IP + port
     # create new node
     node = ChordNode(port)
+    print(node.node_id)
+
 
     # TODO join existing chord
     # if port != 0:
     #     node.join_chord(port)
     #     print('Joined ChordNode {} to existing chord')
-
