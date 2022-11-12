@@ -140,8 +140,7 @@ class ChordNode(object):
         global TEST_BASE
 
         # networking init
-        self.port = n + TEST_BASE
-        TEST_BASE += 1
+        self.port = n
         self.addr = (socket.gethostbyname('localhost'), self.port)
 
         # node prop init
@@ -150,13 +149,47 @@ class ChordNode(object):
         # self.predecessor = None
         # self.keys = {}
 
-        # threading start
-        listening_thread = threading.Thread(target=self.listen_thread(), args=(self.addr))
-        listening_thread.start()
+        # threading start TODO TEST THREADING WHEN RPC CALLS DONE
+        # listening_thread = threading.Thread(target=self.listen_thread(), args=(self.addr))
+        # listening_thread.start()
 
         # log
         print('chordnod: Created new ChordNode on port {} w/ id {}'.format(self.port,
                                                                          self.node_id))
+
+    ###### start chord algo methods
+
+    @staticmethod
+    def get_node_hash(n):
+        """ Creates the node id by hashing the endpoint and port using SHA1 per spec.
+        :return: hashed node id
+        """
+        return hashlib.sha1((socket.gethostbyname('localhost') + str(n)).encode()).digest()
+
+    @property
+    def successor(self):
+        return self.finger[1].node_id
+
+    @successor.setter
+    def successor(self, id):
+        self.finger[1].node_id = id
+
+    def find_successor(self, id):
+        """ Ask this node to find id's successor = successor(predecessor(id))"""
+        np = self.find_predecessor(id)
+        return self.call_rpc(np, 'successor')
+
+    # TODO
+    def find_predecessor(self, id):
+        pass
+
+    ###### end chord algo methods
+
+    ###### start networking rpc methods
+
+    # TODO
+    def call_rpc(self, np, param):
+        pass
 
     def dispatch_rpc(self, method, arg1, arg2):  # server side
         """
@@ -166,7 +199,6 @@ class ChordNode(object):
         :param arg2:
         :return:
         """
-
 
     def handle_rpc(self, client):  # server side
         """Unmarshalls msg from client, routes request to dispatch_rpc, waits
@@ -194,35 +226,8 @@ class ChordNode(object):
             client, client_addr = server.accept()
             threading.Thread(target=self.handle_rpc, args=(client,)).start()
 
+    ###### end networking rpc methods
 
-
-    @staticmethod
-    def get_node_hash(n):
-        """ Creates the node id by hashing the endpoint and port using SHA1 per spec.
-        :return: hashed node id
-        """
-        return hashlib.sha1((socket.gethostbyname('localhost') + str(n)).encode()).digest()
-
-    # @property
-    # def successor(self):
-    #     return self.finger[1].node_id
-
-    # @successor.setter
-    # def successor(self, id):
-    #     self.finger[1].node_id = id
-    #
-    # def find_successor(self, id):
-    #     """ Ask this node to find id's successor = successor(predecessor(id))"""
-    #     np = self.find_predecessor(id)
-    #     return self.call_rpc(np, 'successor')
-    #
-    # # TODO
-    # def find_predecessor(self, id):
-    #     pass
-    #
-    # # TODO
-    # def call_rpc(self, np, param):
-    #     pass
 
 
 if __name__ == '__main__':

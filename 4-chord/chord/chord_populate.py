@@ -8,19 +8,18 @@ CSV: https://docs.python.org/3/library/csv.html
 """
 import csv  # for data parsing
 import json  # for nested dict formating
+from pathlib import Path  # to check if file exists
 import sys
 import hashlib  # for consistent hashing with SHA-1
 
 
-class ChordPopulate(object):
+class FileParser(object):
     """
     """
 
-    def __init__(self, port, filename):
-        self.next_port_number, self.file = port, filename
+    def __init__(self, file):
+        self.file = file
         self.data = {}
-
-        self.run()
 
     @staticmethod
     def export_data(d):
@@ -47,8 +46,9 @@ class ChordPopulate(object):
                                       }
         }
         """
+
+        # init csv lib object and get column names per spec to use as keys
         with open(self.file, newline='') as csvfile:
-            # init csv lib object and get column names per spec to use as keys
             myReader = csv.DictReader(csvfile)
             playerId, year = myReader.fieldnames[0], myReader.fieldnames[3]
 
@@ -62,16 +62,30 @@ class ChordPopulate(object):
             # optionally, check the data format is correct
             self.export_data(self.data)
 
+    def get_data(self):
+        return self.data
+
+class Chord(object):
+    def __init__(self, filename, port):
+        self.first_port = port
+        self.chord_data = FileParser(filename).get_data()
+        self.node_map = None
+
     def run(self):
-        print('chordpop: Running chord populate')
-        self.parse_and_store_data()
+        # init node lookup
+
+        while True:
+            pass
 
 
 if __name__ == '__main__':
-    print('chordpop: Command line call for 1st time...')
+    print('//// CHORD POPULATE ////')
+    print('>>> Enter new node port and data filepath')
     if len(sys.argv) != 3:
         print('chord_populate.py usage')
         print('python chord_populate.py [existing node port] [filename of data file]')
         exit(1)
+
     port, filename = str(sys.argv[1]), sys.argv[2]
-    myChordPopulator = ChordPopulate(port, filename)
+
+    chord_client = Chord(port, filename)
