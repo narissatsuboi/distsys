@@ -8,6 +8,7 @@ the marshaling.
 """
 
 import array  # to encode prior to hash
+from datetime import datetime # for logging
 import hashlib  # for consistent hashing with SHA-1
 import pickle  # for marshalling and unmarshalling
 import socket  # for rpc calls
@@ -142,30 +143,38 @@ POSSIBLE_HOSTS = ['127.0.01']
 POSSIBLE_PORTS = [43544, 43545, 43546, 43547]
 
 
+def pr_log(addr, id, msg):
+    """Logs node activities"""
+    log = '>>> {} : id {} | {} | {}'.format(addr, id, msg, datetime.now().timestamp())
+    print(log)
+
+
 class ChordNode(object):
+    global M, NODES
     # node ip lookup, see lookup_node(n)
     node_map = None
 
     def __init__(self, n):
-        global TEST_BASE
-
         # easy access node info
         self.port = n
         self.addr = ('127.0.01', n)
-        self.node_id = self.lookup_node(self.addr)
+        self.node_id = self.hash_node(*self.addr)
+        pr_log(self.addr, self.node_id, '__init__ populated lookup table')
 
-        # node prop init
-        # self.finger = [None] + [FingerEntry(n, k) for k in range(1, M+1)]  # indexing starts at 1
-        # self.predecessor = None
-        # self.keys = {}
+        # init finger table, idx starts at 1
+        self.finger = [[None], [FingerEntry(self.node_id, k) for k in range(1, M+1)]]
+        pr_log(self.addr, self.node_id, '__init__ finger table')
+
+        self.predecessor = None
+        self.keys = {}
 
         # threading start TODO TEST THREADING WHEN RPC CALLS DONE
         # listening_thread = threading.Thread(target=self.listen_thread(), args=(self.addr))
         # listening_thread.start()
 
         # log
-        print('chordnod: Created new ChordNode on port {} w/ id {}'.format(self.port,
-                                                                           self.node_id))
+        pr_log(self.addr, self.node_id, '__init__ complete')
+
 
     @staticmethod
     def hash_node(host, port):
@@ -178,7 +187,7 @@ class ChordNode(object):
         return digest
 
     @staticmethod
-    def lookup_node(this_addr=None, n=None):
+    def lookup_node(n):
         # generate precomputed map {node_ids : addr ...}
         if ChordNode.node_map is None:
             nm = {}
@@ -187,9 +196,6 @@ class ChordNode(object):
                 for port in POSSIBLE_PORTS:
                     addr = (host, port)
                     n = ChordNode.hash_node(host, port)
-                    # get this node's id
-                    if this_addr and addr == this_addr:
-                        return n
                     if n in nm:
                         print('cannot use', addr, 'hash conflict', n)
                     else:
@@ -267,7 +273,7 @@ class ChordNode(object):
 
 
 if __name__ == '__main__':
-    # print('chord_node.py')
+
     if len(sys.argv) != 2:
         print('Usage to start new node in new network: ')
         print('python chord_node.py 0')
@@ -275,11 +281,10 @@ if __name__ == '__main__':
         print('Usage to join new node to existing network: ')
         print('python chord_node.py [port of existing node]')
 
-    port = int(sys.argv[1])  # todo update to endpoint IP + port
+    # port = int(sys.argv[1])  # todo update to endpoint IP + port
+    port = 43543
     # create new node
     node = ChordNode(port)
-    print(node.node_id)
-
 
     # TODO join existing chord
     # if port != 0:
