@@ -156,18 +156,24 @@ class ChordNode(object):
         self.pr_log('__init__ populated lookup table')
 
         # init finger table, idx starts at 1
-        self.finger = [None] + [FingerEntry(self.node_id, k) for k in range(1, M+1)]
+        self.finger = [[None], [FingerEntry(self.node_id, k) for k in range(1, M+1)]]
         self.pr_log('__init__ finger table')
         self.predecessor = None
         self.keys = {}
 
-        # threading start TODO DONT THINK THIS CALL IS NEEDED
-        # listening_thread = threading.Thread(target=self.listen_thread(), args=(self.addr))
-        # listening_thread.start()
-        #
+    def __repr__(self):
+        node = 'NODE ' + str(self.node_id) + ' at ' + str(self.addr) + '\n'
+        node += 'KEYS: {}'.format(self.keys[self.node_id]) + '\n'
+        node += 'PRE : {}'.format(self.predecessor) + '\n'
+        # node += 'SUC : {}'.format(self.successor) + '\n'
+        node += 'FING: ' + '\n'
+        node += str(self.finger)
 
-        # log
-        self.pr_log('__init__ complete')
+        ft = ''
+        for i in range(1, len(self.finger)):
+            ft += (str(self.finger[i]) + '\n')
+
+        return node + ft
 
     def pr_log(self, msg):
         """Logs node activities"""
@@ -234,6 +240,16 @@ class ChordNode(object):
         given key or add a key/value pair (with replacement)"""
 
     def listen_for_key_seed(self):
+        """ Each node will wait for FIRST_NODE_TIMEOUT seconds to be populated with all
+        the chord's keys (from chord_populate.py). Per the spec, chord_populate.py
+        is provided the 1st node's address at the command line, then connects and sends
+        all keys in its datastore.
+
+        The first node will save the keys to its keys attribute.
+
+        If this node is NOT the first node or chord_populate.py is down, the timeout will
+        return out of this function.
+        """
         self.pr_log('waiting to be seeded with keys...')
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.settimeout(FIRST_NODE_TIMEOUT)
@@ -249,6 +265,9 @@ class ChordNode(object):
                     self.pr_log('chord_populate connected from {}'.format(_addr))
                     data = pickle.loads(conn.recv(BUF_SZ))
                     self.pr_log('keys: {}'.format(data))
+
+                    # store data to keys
+                    self.keys[self.node_id] = data
 
     def listen_thread(self):  # server side
         """Starts threaded listening server to handle incoming requests"""
@@ -284,6 +303,7 @@ class ChordNode(object):
     def run(self):  # server side
         self.pr_log('listening for conns')
         self.listen_for_key_seed()
+        print(repr(self))
         while True:
             self.listen_thread()
 
