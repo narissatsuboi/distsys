@@ -7,14 +7,12 @@ connections (other nodes or queriers). You can use blocking TCP for this and pic
 the marshaling.
 """
 
-import array  # to encode prior to hash
-from datetime import datetime # for logging
 import hashlib  # for consistent hashing with SHA-1
 import pickle  # for marshalling and unmarshalling
 import socket  # for rpc calls
-import string
 import sys
 import threading  # to prevent deadlock
+from datetime import datetime  # for logging
 
 # globals
 
@@ -162,9 +160,9 @@ class ChordNode(object):
         pr_log(self.addr, self.node_id, '__init__ populated lookup table')
 
         # init finger table, idx starts at 1
-        self.finger = [[None], [FingerEntry(self.node_id, k) for k in range(1, M+1)]]
+        self.finger = [None] + [FingerEntry(self.node_id, k) for k in range(1, M+1)]
         pr_log(self.addr, self.node_id, '__init__ finger table')
-
+        print(self.finger)
         self.predecessor = None
         self.keys = {}
 
@@ -207,11 +205,11 @@ class ChordNode(object):
 
     @property
     def successor(self):
-        return self.finger[1].node_id
+        return self.finger[1].node
 
     @successor.setter
     def successor(self, id):
-        self.finger[1].node_id = id
+        self.finger[1].node = id
 
     def find_successor(self, id):
         """ Ask this node to find id's successor = successor(predecessor(id))"""
@@ -229,6 +227,10 @@ class ChordNode(object):
     ###### end chord algo methods
 
     ###### start networking rpc methods
+
+    def query_handler(self): # TODO chord_query
+        """ a querier to talk to any arbitrary node in the network to query a value for a
+        given key or add a key/value pair (with replacement)"""
 
     # TODO
     def call_rpc(self, np, param):
