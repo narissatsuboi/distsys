@@ -7,8 +7,11 @@ SHA1: https://en.wikipedia.org/wiki/SHA-1
 CSV: https://docs.python.org/3/library/csv.html
 """
 import csv  # for data parsing
+import pickle
+from datetime import datetime  # for timestamp in log
 import hashlib  # for consistent hashing with SHA-1
 import json  # for nested dict formating
+import socket
 import sys
 
 # globals
@@ -73,7 +76,6 @@ class FileParser(object):
             # parse csv by row, store new {k:v} arrangement in self.data
             for row in myReader:
                 key = self.hash_key(''.join([row[playerId], row[year]]))
-                print(key)
                 self.data[key] = row
 
             # optionally, check the data format is correct
@@ -82,13 +84,31 @@ class FileParser(object):
     def get_data(self):
         return self.data
 
+
 class Chord(object):
-    def __init__(self, filename, port):
-        self.first_port = port
-        self.chord_data = None
+    def __init__(self, port, filename):
+        self.addr = ('127.0.0.1', 0)
+        self.bootstrap_node_addr = ('127.0.01', port)
+        self.chord_data = FileParser(filename).get_data()
+
+        self.pr_log('init chord')  # log
+
+    def pr_log(self, msg):
+        """Logs Chord's activities"""
+        log = '>>> {} | {} | {}'.format(self.addr, msg, datetime.now().timestamp())
+        print(log)
+
+    def rpc_send_keys(self):
+        """Sends list of all keys to first node to join chord"""
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            data = sorted(self.chord_data.keys())
+            s.connect(('127.0.0.1', 43543))
+            s.sendall(pickle.dumps(data))
+
 
     def run(self):
-        # init node lookup
+        # try to send keys to lone node
+        self.rpc_send_keys()
 
         while True:
             pass
@@ -96,13 +116,13 @@ class Chord(object):
 
 if __name__ == '__main__':
     print('//// CHORD POPULATE ////')
-    print('>>> Enter new node port and data filepath')
+    print('>>> Enter first node port and data filepath')
     if len(sys.argv) != 3:
         print('chord_populate.py usage')
         print('python chord_populate.py [existing node port] [filename of data file]')
         exit(1)
 
-    port, filename = str(sys.argv[1]), sys.argv[2]
+    port, filename = int(sys.argv[1]), sys.argv[2]
 
     chord_client = Chord(port, filename)
-    chord_client.chord_data = FileParser(filename).get_data()
+    chord_client.run()

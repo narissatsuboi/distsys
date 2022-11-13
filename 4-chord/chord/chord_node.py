@@ -21,7 +21,7 @@ NODES = 2 ** M  # size of the chord, tot num nodes possible
 BUF_SZ = 4096  # socket recv arg
 BACKLOG = 100  # socket listen arg
 TEST_BASE = 43543  # for testing use port numbers on localhost at TEST_BASE + n
-
+FIRST_NODE_TIMEOUT = 10  # sec
 
 # modrange and modrangeiter helper classes
 class ModRange(object):
@@ -138,13 +138,9 @@ class FingerEntry(object):
 
 
 POSSIBLE_HOSTS = ['127.0.01']
-POSSIBLE_PORTS = [43544, 43545, 43546, 43547]
+POSSIBLE_PORTS = [43543, 43544, 43545, 43546]
 
 
-def pr_log(addr, id, msg):
-    """Logs node activities"""
-    log = '>>> {} : id {} | {} | {}'.format(addr, id, msg, datetime.now().timestamp())
-    print(log)
 
 
 class ChordNode(object):
@@ -155,24 +151,29 @@ class ChordNode(object):
     def __init__(self, n):
         # easy access node info
         self.port = n
-        self.addr = ('127.0.01', n)
+        self.addr = ('127.0.0.1', n)
         self.node_id = self.hash_node(*self.addr)
-        pr_log(self.addr, self.node_id, '__init__ populated lookup table')
+        self.pr_log('__init__ populated lookup table')
 
         # init finger table, idx starts at 1
         self.finger = [None] + [FingerEntry(self.node_id, k) for k in range(1, M+1)]
-        pr_log(self.addr, self.node_id, '__init__ finger table')
-        print(self.finger)
+        self.pr_log('__init__ finger table')
         self.predecessor = None
         self.keys = {}
 
-        # threading start TODO TEST THREADING WHEN RPC CALLS DONE
+        # threading start TODO DONT THINK THIS CALL IS NEEDED
         # listening_thread = threading.Thread(target=self.listen_thread(), args=(self.addr))
         # listening_thread.start()
+        #
 
         # log
-        pr_log(self.addr, self.node_id, '__init__ complete')
+        self.pr_log('__init__ complete')
 
+    def pr_log(self, msg):
+        """Logs node activities"""
+        log = '>>> {} : id {} | {} | {}'.format(self.addr, self.node_id, msg,
+                                                datetime.now().timestamp().conjugate())
+        print(log)
 
     @staticmethod
     def hash_node(host, port):
@@ -232,11 +233,47 @@ class ChordNode(object):
         """ a querier to talk to any arbitrary node in the network to query a value for a
         given key or add a key/value pair (with replacement)"""
 
+    def listen_for_key_seed(self):
+        self.pr_log('waiting to be seeded with keys...')
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(FIRST_NODE_TIMEOUT)
+            try:
+                s.bind(self.addr)
+                s.listen(1)
+                conn, _addr = s.accept()
+            except TimeoutError:
+                self.pr_log('not the first node or chord_populate is down')
+                return
+            else:
+                with conn:
+                    self.pr_log('chord_populate connected from {}'.format(_addr))
+                    data = pickle.loads(conn.recv(BUF_SZ))
+                    self.pr_log('keys: {}'.format(data))
+
+    def listen_thread(self):  # server side
+        """Starts threaded listening server to handle incoming requests"""
+
+        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server.bind(self.addr)
+        server.listen(BACKLOG)
+        while True:
+            client, client_addr = server.accept()
+            self.pr_log('listen_thread accepted conn from {}'.format(client_addr))
+            threading.Thread(target=self.handle_rpc, args=(client,)).start()
+
+    def handle_rpc(self, client):
+        """Unmarshalls msg from client, routes request to dispatch_rpc, waits
+        for result and sends back to client."""
+        rpc = client.recv(BUF_SZ)
+        method, arg1, arg2 = pickle.loads(rpc)
+        result = self.rpc_dispatch(method, arg1, arg2)
+        client.sendall(pickle.dumps(result))
+
     # TODO
     def call_rpc(self, np, param):
         pass
 
-    def dispatch_rpc(self, method, arg1, arg2):  # server side
+    def rpc_dispatch(self, method, arg1, arg2):  # server side
         """
 
         :param method:
@@ -244,32 +281,12 @@ class ChordNode(object):
         :param arg2:
         :return:
         """
-
-    def handle_rpc(self, client):  # server side
-        """Unmarshalls msg from client, routes request to dispatch_rpc, waits
-        for result and sends back to client."""
-        rpc = client.recv(BUF_SZ)
-        method, arg1, arg2 = pickle.loads(rpc)
-        result = self.dispatch_rpc(method, arg1, arg2)
-        client.sendall(pickle.dumps(result))
-
-    def listen_thread(self):  # server side
-        """Starts threaded listening server to handle incoming requests"""
-
-        # with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
-        #     server.setblocking(False)
-        #     server.bind(self.addr)
-        #     server.listen(BACKLOG)
-        #     while True:
-        #         client, client_addr = server.accept()
-        #         threading.Thread(target=self.handle_rpc, args=(client,)).start()
-
-        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        server.bind(self.addr)
-        server.listen(BACKLOG)
+    def run(self):  # server side
+        self.pr_log('listening for conns')
+        self.listen_for_key_seed()
         while True:
-            client, client_addr = server.accept()
-            threading.Thread(target=self.handle_rpc, args=(client,)).start()
+            self.listen_thread()
+
 
     ###### end networking rpc methods
 
@@ -287,6 +304,7 @@ if __name__ == '__main__':
     port = 43543
     # create new node
     node = ChordNode(port)
+    node.run()
 
     # TODO join existing chord
     # if port != 0:
