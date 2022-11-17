@@ -131,7 +131,7 @@ class FingerEntry(object):
 
     def __repr__(self):
         """ Something like the interval|node charts in the paper """
-        return '{} {} {}'.format(self.start, self.next_start, self.node)
+        return '{} {} {}'.format(self.start, self.interval, self.node)
 
     def __contains__(self, id):
         """ Is the given id within this finger's interval? """
@@ -140,14 +140,13 @@ class FingerEntry(object):
 
 class ChordNode(object):
     global M, NODES
-    # node ip lookup, see lookup_node(n)
-    node_map = None
 
     def __init__(self, n):
         # easy access node info
         self.port = n
         self.addr = ('127.0.0.1', n)
         self.node = self.hash_node(*self.addr)
+        self.node_map = self.create_reverse_lookup()
         self.pr_log('__init__ populated lookup table')
 
         # init finger table, idx starts at 1
@@ -168,14 +167,12 @@ class ChordNode(object):
         for i in range(1, len(self.finger)):
             ft += ': ' + str(i) + ' :'
             fte = self.finger[i]
-            start, int, node = fte.start
 
         return node + ft
 
     def pr_log(self, msg):
         """Logs node activities"""
-        log = '>>> {} : id {} | {} | {}'.format(self.addr, self.node, msg,
-                                                datetime.now().timestamp().conjugate())
+        log = '>>> {} : id {} | {}'.format(self.addr, self.node, msg)
         print(log)
 
     @staticmethod
@@ -188,24 +185,23 @@ class ChordNode(object):
         digest = int(digest, 16) % pow(2, M)
         return digest
 
-    @staticmethod
-    def lookup_node(n):
+    def create_reverse_lookup(self):
         # generate precomputed map {node_ids : addr ...}
-        if ChordNode.node_map is None:
-            nm = {}
-            for host in POSSIBLE_HOSTS:
-                host = host
-                for port in POSSIBLE_PORTS:
-                    addr = (host, port)
-                    n = ChordNode.hash_node(host, port)
-                    if n in nm:
-                        print('cannot use', addr, 'hash conflict', n)
-                    else:
-                        nm[n] = addr
+        nm = {}
+        for host in POSSIBLE_HOSTS:
+            host = host
+            for port in POSSIBLE_PORTS:
+                addr = (host, port)
+                n = ChordNode.hash_node(host, port)
+                if n in nm:
+                    print('cannot use', addr, 'hash conflict', n)
+                else:
+                    nm[n] = addr
             ChordNode.node_map = nm
-        # fetch addr off other node
-        # lookup in precomputed table
-        return ChordNode.node_map[n]
+
+        self.node_map = nm
+
+    # TODO GET ADDRESSES OUT OF CREATE REVERSE LOOKUP
 
     @property
     def successor(self):
@@ -334,31 +330,34 @@ class ChordNode(object):
         # populate finger init fingertable
         # self.update_finger_table(self.node, 1)
         print(repr(self))
-        pass
 
 
 if __name__ == '__main__':
-
+    # invalid usage, print file usage to console
     if len(sys.argv) != 2:
         print('Usage to start new node in new network: ')
         print('python chord_node.py 0')
 
         print('Usage to join new node to existing network: ')
         print('python chord_node.py [port of existing node]')
+        exit(1)
 
+    # store port
     port = int(sys.argv[1])  # todo update to endpoint IP + port
 
     # create new node
     if port == 0:
         print('>>> Starting new Chord...')
-        node = ChordNode(port)
+        node = ChordNode(43544)
         node.run()
         print('>>> Joined ChordNode {} to new chord'.format(node.node))
+        exit(0)
 
     # join existing chord
-    if port != 0:
-        print('>>> Trying to join Chord...')
+    elif port != 43544:
+        print('>>> Trying to join Chord w/ existing node port...')
         node = ChordNode(port)
         node.join_chord(port)
         print('>>> Joined ChordNode {} to existing chord'.format(node.node))
         node.run()
+        exit(0)
