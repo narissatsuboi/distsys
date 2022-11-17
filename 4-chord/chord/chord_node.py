@@ -185,6 +185,7 @@ class ChordNode(object):
         digest = int(digest, 16) % pow(2, M)
         return digest
 
+    """ BEGIN REVERSE LOOK UP """
     def create_reverse_lookup(self):
         # generate precomputed map {node_ids : addr ...}
         nm = {}
@@ -197,11 +198,14 @@ class ChordNode(object):
                     print('cannot use', addr, 'hash conflict', n)
                 else:
                     nm[n] = addr
-            ChordNode.node_map = nm
-
         self.node_map = nm
 
-    # TODO GET ADDRESSES OUT OF CREATE REVERSE LOOKUP
+    def get_node_address(self, hashed_node):
+        if hashed_node not in self.node_map:
+            print('get_node_address: invalid key')
+            return
+        return self.node_map[hashed_node]
+    """ END REVERSE LOOK UP """
 
     @property
     def successor(self):
@@ -348,13 +352,13 @@ if __name__ == '__main__':
     # create new node
     if port == 0:
         print('>>> Starting new Chord...')
-        node = ChordNode(43544)
+        node = ChordNode(TEST_BASE)
         node.run()
         print('>>> Joined ChordNode {} to new chord'.format(node.node))
         exit(0)
 
     # join existing chord
-    elif port != 43544:
+    elif port != TEST_BASE:
         print('>>> Trying to join Chord w/ existing node port...')
         node = ChordNode(port)
         node.join_chord(port)
