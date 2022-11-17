@@ -22,8 +22,10 @@ BUF_SZ = 4096  # socket recv arg
 BACKLOG = 100  # socket listen arg
 TEST_BASE = 43543  # for testing use port numbers on localhost at TEST_BASE + n
 FIRST_NODE_TIMEOUT = 10  # sec
+POSSIBLE_HOSTS = ['127.0.01']
+POSSIBLE_PORTS = [43543, 43544, 43545, 43546]
 
-# modrange and modrangeiter helper classes
+
 class ModRange(object):
     """
     Range-like object that wraps around 0 at some divisor using modulo arithmetic.
@@ -98,7 +100,6 @@ class ModRangeIter(object):
         return self.mr.intervals[self.i][self.j]
 
 
-# finger table class
 class FingerEntry(object):
     """
     Row in a finger table.
@@ -106,7 +107,7 @@ class FingerEntry(object):
     >>> fe = FingerEntry(0, 1)
     >>> fe
 
-    >>> fe.node_id = 1
+    >>> fe.node = 1
     >>> fe
 
     >>> 1 in fe, 2 in fe
@@ -130,17 +131,11 @@ class FingerEntry(object):
 
     def __repr__(self):
         """ Something like the interval|node charts in the paper """
-        return ''.format(self.start, self.next_start, self.node)
+        return '{} {} {}'.format(self.start, self.next_start, self.node)
 
     def __contains__(self, id):
         """ Is the given id within this finger's interval? """
         return id in self.interval
-
-
-POSSIBLE_HOSTS = ['127.0.01']
-POSSIBLE_PORTS = [43543, 43544, 43545, 43546]
-
-
 
 
 class ChordNode(object):
@@ -152,32 +147,34 @@ class ChordNode(object):
         # easy access node info
         self.port = n
         self.addr = ('127.0.0.1', n)
-        self.node_id = self.hash_node(*self.addr)
+        self.node = self.hash_node(*self.addr)
         self.pr_log('__init__ populated lookup table')
 
         # init finger table, idx starts at 1
-        self.finger = [[None], [FingerEntry(self.node_id, k) for k in range(1, M+1)]]
+        self.finger = [[None], [FingerEntry(self.node, k, self.node) for k in range(1,
+                                                                                    M + 1)]]
         self.pr_log('__init__ finger table')
         self.predecessor = None
-        self.keys = {}
+        self.keys = ()
 
     def __repr__(self):
-        node = 'NODE ' + str(self.node_id) + ' at ' + str(self.addr) + '\n'
-        node += 'KEYS: {}'.format(self.keys[self.node_id]) + '\n'
+        node = 'NODE ' + str(self.node) + ' at ' + str(self.addr) + '\n'
+        node += 'KEYS: {}'.format(self.keys) + '\n'
         node += 'PRE : {}'.format(self.predecessor) + '\n'
         # node += 'SUC : {}'.format(self.successor) + '\n'
-        node += 'FING: ' + '\n'
         node += str(self.finger)
-
         ft = ''
+        ft += ': k  : start :  int  : succ :\n'
         for i in range(1, len(self.finger)):
-            ft += (str(self.finger[i]) + '\n')
+            ft += ': ' + str(i) + ' :'
+            fte = self.finger[i]
+            start, int, node = fte.start
 
         return node + ft
 
     def pr_log(self, msg):
         """Logs node activities"""
-        log = '>>> {} : id {} | {} | {}'.format(self.addr, self.node_id, msg,
+        log = '>>> {} : id {} | {} | {}'.format(self.addr, self.node, msg,
                                                 datetime.now().timestamp().conjugate())
         print(log)
 
@@ -227,15 +224,35 @@ class ChordNode(object):
     def find_predecessor(self, id):
         pass
 
+    def update_others(self):
+        """ Update all other node that should have this node in their finger tables """
+        # print('update_others()')
+        for i in range(1, M + 1):  # find last node p whose i-th finger might be this node
+            # FIXME: bug in paper, have to add the 1 +
+            p = self.find_predecessor((1 + self.node - 2 ** (i - 1) + NODES) % NODES)
+            self.call_rpc(p, 'update_finger_table', self.node, i)
 
-    def join_chord(self):
-        pass
+    def update_finger_table(self, s, i):
+        """ if s is i-th finger of n, update this node's finger table with s """
+        # FIXME: don't want e.g. [1, 1) which is the whole circle
+        if (self.finger[i].start != self.finger[i].node
+                # FIXME: bug in paper, [.start
+                and s in ModRange(self.finger[i].start, self.finger[i].node, NODES)):
+            print('update_finger_table({},{}): {}[{}] = {} since {} in [{},{})'.format(
+                s, i, self.node, i, s, s, self.finger[i].start, self.finger[i].node))
+            self.finger[i].node = s
+            print('#', self)
+            p = self.predecessor  # get first node preceding myself
+            self.call_rpc(p, 'update_finger_table', s, i)
+            return str(self)
+        else:
+            return 'did nothing {}'.format(self)
 
     ###### end chord algo methods
 
     ###### start networking rpc methods
 
-    def query_handler(self): # TODO chord_query
+    def query_handler(self):  # TODO chord_query
         """ a querier to talk to any arbitrary node in the network to query a value for a
         given key or add a key/value pair (with replacement)"""
 
@@ -267,7 +284,7 @@ class ChordNode(object):
                     self.pr_log('keys: {}'.format(data))
 
                     # store data to keys
-                    self.keys[self.node_id] = data
+                    self.keys.add(data)
 
     def listen_thread(self):  # server side
         """Starts threaded listening server to handle incoming requests"""
@@ -300,15 +317,24 @@ class ChordNode(object):
         :param arg2:
         :return:
         """
+
     def run(self):  # server side
         self.pr_log('listening for conns')
-        self.listen_for_key_seed()
-        print(repr(self))
+        self.join_chord(self.port)
         while True:
             self.listen_thread()
 
-
     ###### end networking rpc methods
+
+    def join_chord(self, port):
+        # if first node, seedes this node with all keys
+        self.listen_for_key_seed()
+        print(repr(self))
+
+        # populate finger init fingertable
+        # self.update_finger_table(self.node, 1)
+        print(repr(self))
+        pass
 
 
 if __name__ == '__main__':
@@ -320,13 +346,19 @@ if __name__ == '__main__':
         print('Usage to join new node to existing network: ')
         print('python chord_node.py [port of existing node]')
 
-    # port = int(sys.argv[1])  # todo update to endpoint IP + port
-    port = 43543
-    # create new node
-    node = ChordNode(port)
-    node.run()
+    port = int(sys.argv[1])  # todo update to endpoint IP + port
 
-    # TODO join existing chord
-    # if port != 0:
-    #     node.join_chord(port)
-    #     print('Joined ChordNode {} to existing chord')
+    # create new node
+    if port == 0:
+        print('>>> Starting new Chord...')
+        node = ChordNode(port)
+        node.run()
+        print('>>> Joined ChordNode {} to new chord'.format(node.node))
+
+    # join existing chord
+    if port != 0:
+        print('>>> Trying to join Chord...')
+        node = ChordNode(port)
+        node.join_chord(port)
+        print('>>> Joined ChordNode {} to existing chord'.format(node.node))
+        node.run()

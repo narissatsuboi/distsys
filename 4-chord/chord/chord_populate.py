@@ -112,6 +112,7 @@ class Chord(object):
 
         while True:
             pass
+        # TODO, stay alive and work with chord_query.py
 
 
 if __name__ == '__main__':
