@@ -1,2 +1,2 @@
 #!/usr/bin/env bash
-python chord_node.py 43543
+python chord_node.py 0

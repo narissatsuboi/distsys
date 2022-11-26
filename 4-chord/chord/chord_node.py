@@ -131,7 +131,7 @@ class FingerEntry(object):
 
     def __repr__(self):
         """ Something like the interval|node charts in the paper """
-        return '{} {} {}'.format(self.start, self.interval, self.node)
+        return '| {} {} {} | '.format(self.start, self.interval, self.node)
 
     def __contains__(self, id):
         """ Is the given id within this finger's interval? """
@@ -161,13 +161,10 @@ class ChordNode(object):
         node += 'KEYS: {}'.format(self.keys) + '\n'
         node += 'PRE : {}'.format(self.predecessor) + '\n'
         # node += 'SUC : {}'.format(self.successor) + '\n'
-        node += str(self.finger)
         ft = ''
-        ft += ': k  : start :  int  : succ :\n'
+        ft += ': k : start :  int  : succ :\n'
         for i in range(1, len(self.finger)):
-            ft += ': ' + str(i) + ' :'
-            fte = self.finger[i]
-
+            ft += str(i) + ' ' + repr(self.finger[i]) + '\n'
         return node + ft
 
     def pr_log(self, msg):
@@ -333,7 +330,6 @@ class ChordNode(object):
 
         # populate finger init fingertable
         # self.update_finger_table(self.node, 1)
-        print(repr(self))
 
 
 if __name__ == '__main__':
