@@ -2,25 +2,31 @@
 
 
 References
+(0) header - > https://github.com/nfj5/Distributed-Systems-CPSC5520-FQ19/blob/ddf90183ef6b4da09059af4c137e6004c8f49219/Lab5/lab5.py#L185
 (1) version msg -> https://developer.bitcoin.org/reference/p2p_networking.html#version
 (2) bitcoin version -> https://developer.bitcoin.org/reference/p2p_networking.html#protocol-versions
 (3) byte conversion -> https://docs.python.org/3/library/stdtypes.html#int.from_bytes,
 https://docs.python.org/3/library/stdtypes.html#int.to_bytes
 (4) python utc to unixtime -> https://stackoverflow.com/questions/16755394/what-is-the-easiest-way-to-get-current-gmt-time-in-unix-timestamp-format
-
+(5) Max BTC buffer size -> https://github.com/nfj5/Distributed-Systems-CPSC5520-FQ19/blob
+/ddf90183ef6b4da09059af4c137e6004c8f49219/Lab5/lab5.py#L185
 """
 
 import hashlib
 import socket
+import sys
+from enum import Enum
 from socket import error as socket_error
 from datetime import datetime, date
 import calendar
 from time import strftime, gmtime
 
-BUF_SZ = 4096
+BUF_SZ = 2_000_000
 BITCOIN_HOST = '97.126.42.129'
 BITCOIN_PORT = 8333
 BITCOIN_CORE_VERSION = 70015
+MAGIC = 'f9beb4d9'  # originating network for header
+
 
 
 class ConvertTo(object):
@@ -90,6 +96,12 @@ class ConvertTo(object):
     def unmarshal_uint(b):
         return int.from_bytes(b, byteorder='little', signed=False)
 
+class BTCCommands(Enum):
+    VERACK = 'verack'
+    GETBLOCKS = 'get_blocks'
+    INV = 'inv'  # inventory
+    GETDATA = 'getdata'
+    BLOCK = 'block'
 
 class Client(object):
 
@@ -101,6 +113,38 @@ class Client(object):
     def get_unix_epoch_time():
         d = datetime.utcnow()
         return calendar.timegm(d.utctimetuple())
+
+    def make_header_msg(self, command, payload):
+        """ Determines header params and converts to bytes. Returns
+        byte str of header information.
+        :param command: bitcoin command to send to node
+        """
+
+        CMD_MAX_LEN = 12  # req'd byte len of encoded command
+        MAX_PAYLOAD = 1_000_000 * 32  # ~ 32 MiB, expressed in B
+
+        # magic bytes for originating network, char[4], 4b
+        # f9beb4d9 -> bytearray(b'\xf9\xbe\xb4\xd9')
+        magic_bytes = bytearray.fromhex(MAGIC)
+
+        # command name, char[12], 12b, pad with \0s per spec
+        command_b = command.encode()
+        if len(command_b) < CMD_MAX_LEN:
+            command_b += ('\0' * (CMD_MAX_LEN - len(command_b))).encode()
+
+        # payload size, uint32_t, 4b
+        payload_size_b = sys.getsizeof(payload)
+        if payload_size_b > MAX_PAYLOAD:
+            print('Payload size exceeds MAX_SIZE, msg may be dropped or rejected')
+
+        # checksum, first 4 bytes of SHA256(SHA256(payload)) char[4], 4b
+        if payload_size_b < 2:
+            checksum = '0x5df6e0e2'
+        else:
+            # call checksum
+            pass
+
+
 
     def make_version_msg(self):
         """
@@ -157,18 +201,18 @@ class Client(object):
 
         return version_msg
 
-    def print_version_msg(self, b):
+    @staticmethod
+    def print_version_msg(b):
         """Prints formatted list of version_msg, where bytes shown in hex
         :param b: payload from make_version_msg
         """
 
         # pull out fields
-        version, my_services, epoch_time, your_services = b[:4], b[4:12], b[12:20], b[
-                                                                                    20:28]
-        rec_host, rec_port, my_services2, my_host, my_port = b[28:44], b[44:46], b[
-                                                                                 46:54], b[
-                                                                                         54:70], b[
-                                                                                                 70:72]
+        version, my_services, epoch_time, your_services = b[:4], b[4:12], b[12:20], \
+                                                          b[20:28]
+        rec_host, rec_port, my_services2, my_host, my_port = b[28:44], b[44:46], \
+                                                             b[46:54], b[54:70], \
+                                                             b[70:72]
         nonce = b[72:80]
         user_agent_size, uasz = ConvertTo.unmarshal_compactsize(b[80:])
         i = 80 + len(user_agent_size)
@@ -210,5 +254,6 @@ if __name__ == '__main__':
     print('data')
     cli = Client()
     version_msg = cli.make_version_msg()
-    cli.print_version_msg(version_msg)
+    # cli.print_version_msg(version_msg)
+    cli.make_header_msg('version', version_msg)
 
