@@ -10,11 +10,12 @@ https://docs.python.org/3/library/stdtypes.html#int.to_bytes
 
 """
 
-import pickle
+import hashlib
 import socket
 from socket import error as socket_error
 from datetime import datetime, date
 import calendar
+from time import strftime, gmtime
 
 BUF_SZ = 4096
 BITCOIN_HOST = '97.126.42.129'
@@ -93,7 +94,7 @@ class ConvertTo(object):
 class Client(object):
 
     def __init__(self):
-        self.host, self.port = '127.0. 0.1', 55555
+        self.host, self.port = '127.0. 0.1', 59550
         self.addr = (self.host, self.port)
 
     @staticmethod
@@ -153,10 +154,61 @@ class Client(object):
                       addr_recv_ip_addr + addr_recv_port + addr_trans_services + \
                       addr_trans_ip_addr + addr_trans_port + nonce + compactSizeuint + \
                       start_height + relay
+
         return version_msg
+
+    def print_version_msg(self, b):
+        """Prints formatted list of version_msg, where bytes shown in hex
+        :param b: payload from make_version_msg
+        """
+
+        # pull out fields
+        version, my_services, epoch_time, your_services = b[:4], b[4:12], b[12:20], b[
+                                                                                    20:28]
+        rec_host, rec_port, my_services2, my_host, my_port = b[28:44], b[44:46], b[
+                                                                                 46:54], b[
+                                                                                         54:70], b[
+                                                                                                 70:72]
+        nonce = b[72:80]
+        user_agent_size, uasz = ConvertTo.unmarshal_compactsize(b[80:])
+        i = 80 + len(user_agent_size)
+        user_agent = b[i:i + uasz]
+        i += uasz
+        start_height, relay = b[i:i + 4], b[i + 4:i + 5]
+        extra = b[i + 5:]
+
+        # print report
+        prefix = '  '
+        print(prefix + 'VERSION')
+        print(prefix + '-' * 56)
+        prefix *= 2
+        print('{}{:32} version {}'.format(prefix, version.hex(), ConvertTo.unmarshal_int(version)))
+        print('{}{:32} my services'.format(prefix, my_services.hex()))
+        time_str = strftime("%a, %d %b %Y %H:%M:%S GMT",
+                            gmtime(ConvertTo.unmarshal_int(epoch_time)))
+        print('{}{:32} epoch time {}'.format(prefix, epoch_time.hex(), time_str))
+        print('{}{:32} your services'.format(prefix, your_services.hex()))
+        print(
+            '{}{:32} your host {}'.format(prefix, rec_host.hex(), ConvertTo.ipv6_to_ipv4(rec_host)))
+        print('{}{:32} your port {}'.format(prefix, rec_port.hex(),
+                                            ConvertTo.unmarshal_uint(rec_port)))
+        print('{}{:32} my services (again)'.format(prefix, my_services2.hex()))
+        print('{}{:32} my host {}'.format(prefix, my_host.hex(), ConvertTo.ipv6_to_ipv4(my_host)))
+        print('{}{:32} my port {}'.format(prefix, my_port.hex(), ConvertTo.unmarshal_uint(my_port)))
+        print('{}{:32} nonce'.format(prefix, nonce.hex()))
+        print('{}{:32} user agent size {}'.format(prefix, user_agent_size.hex(), uasz))
+        print('{}{:32} user agent \'{}\''.format(prefix, user_agent.hex(),
+                                                 str(user_agent, encoding='utf-8')))
+        print('{}{:32} start height {}'.format(prefix, start_height.hex(),
+                                               ConvertTo.unmarshal_uint(start_height)))
+        print('{}{:32} relay {}'.format(prefix, relay.hex(), bytes(relay) != b'\0'))
+        if len(extra) > 0:
+            print('{}{:32} EXTRA!!'.format(prefix, extra.hex()))
 
 
 if __name__ == '__main__':
     print('data')
     cli = Client()
-    print(cli.make_version_msg())
+    version_msg = cli.make_version_msg()
+    cli.print_version_msg(version_msg)
+
