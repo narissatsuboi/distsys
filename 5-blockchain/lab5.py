@@ -10,6 +10,7 @@ https://docs.python.org/3/library/stdtypes.html#int.to_bytes
 (4) python utc to unixtime -> https://stackoverflow.com/questions/16755394/what-is-the-easiest-way-to-get-current-gmt-time-in-unix-timestamp-format
 (5) Max BTC buffer size -> https://github.com/nfj5/Distributed-Systems-CPSC5520-FQ19/blob
 /ddf90183ef6b4da09059af4c137e6004c8f49219/Lab5/lab5.py#L185
+(6) getblocks -> https://developer.bitcoin.org/reference/p2p_networking.html#getblocks
 """
 
 import hashlib
@@ -99,7 +100,8 @@ class ConvertTo(object):
 
 class Client(object):
 
-    def __init__(self):
+    def __init__(self, block_num):
+        self.block_num = block_num % 10000
         self.host, self.port = '127.0. 0.1', 59550
         self.addr = (self.host, self.port)
 
@@ -108,24 +110,42 @@ class Client(object):
 
         """
 
-        # create version msg and header msg
+        # version
         version_msg = self.make_version_msg()
-        header_msg = self.make_header_msg('version', version_msg)  # TODO make
-        # flexible
+        version_hdr = self.make_header('version', version_msg)  # TODO make
+        version = version_hdr + version_msg
 
-        # create msg
+        # verack (hdr only)
+        verack = self.make_header('verack')
+
+        # block
+        block_msg = self.make_getblocks_msg()
+        block_hdr = self.make_header('getblocks', block_msg)
+        block = block_hdr + block_msg
 
         # print header msg and version msg
-        # self.print_header(header_msg)
-        # self.print_version_msg(version_msg)
-        self.print_msg(header_msg + version_msg)
+        self.print_msg(version_hdr + version_msg, 'sending')
+
+        response = self.message_node(version)
+        print(response)
+
+    def message_node(self, b):
+        """Sends message to BTC node and waits for response
+        :param b: bytes to send as msg
+        :returns: response from node
+        """
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            # s.settimeout(1500)
+            s.connect((BITCOIN_HOST, BITCOIN_PORT))
+            s.sendall(b)
+            return s.recv(BUF_SZ)
 
     @staticmethod
     def get_unix_epoch_time():
         d = datetime.utcnow()
         return calendar.timegm(d.utctimetuple())
 
-    def make_header_msg(self, command, payload=None):
+    def make_header(self, command, payload=None):
         """ Determines header params and converts to bytes. Returns
         byte str of header information.
         :param command: bitcoin command to send to node
@@ -156,7 +176,6 @@ class Client(object):
 
         # checksum, first 4 bytes of SHA256(SHA256(payload)) char[4], 4b
         checksum = self.checksum(payload)
-        print('checksum', checksum.hex())
         header = magic_bytes + command + payload_size_b + checksum
         return header
 
@@ -223,6 +242,25 @@ class Client(object):
                       start_height + relay
 
         return version_msg
+
+    def make_getblocks_msg(self):
+        """ Used to request an 'inv' msg from BTC node. Reference (6) for data sizes.
+        :returns: inv msg in bytes
+        """
+
+        # version, uint32_t, 4b
+        version = ConvertTo.int32_t(BITCOIN_CORE_VERSION)
+
+        # hashcount, compactSizeuint
+        hashcount = ConvertTo.compactsize_t(2)
+
+        # block header hashes, char[32]
+        hdr_hashes = bytearray(32)
+
+        # stop hash, char[32], 32
+        stop_hash = bytearray(32)
+
+        return version + hashcount + hdr_hashes + stop_hash
 
     def print_msg(self, msg, text=None):
         print('\n{}MESSAGE'.format('' if text is None else (text + ' ')))
@@ -318,5 +356,6 @@ class Client(object):
 if __name__ == '__main__':
     print('Running client')
     # init client
-    cli = Client()
+    my_block = 1697482
+    cli = Client(my_block)
     cli.run_cli()
