@@ -109,41 +109,70 @@ class Client(object):
         self.host, self.port = '127.0. 0.1', 59550
         self.addr = (self.host, self.port)
 
+    def run_cli(self):
+        """
+
+        """
+
+        # create version msg and header msg
+        version_msg = self.make_version_msg()
+        header_msg = self.make_header_msg('version', version_msg)  #TODO make flexible
+
+        # create msg
+        self.make_msg(header_msg, version_msg)
+
+        # print header msg and version msg
+        self.print_header(header_msg)
+        self.print_version_msg(version_msg)
+
+
     @staticmethod
     def get_unix_epoch_time():
         d = datetime.utcnow()
         return calendar.timegm(d.utctimetuple())
 
-    def make_header_msg(self, command, payload):
+    def make_header_msg(self, command, payload=None):
         """ Determines header params and converts to bytes. Returns
         byte str of header information.
         :param command: bitcoin command to send to node
+        :param payload: byte str or byte array
         """
 
-        CMD_MAX_LEN = 12  # req'd byte len of encoded command
+        CMD_MAX_LEN = 12              # req'd byte len of encoded command
         MAX_PAYLOAD = 1_000_000 * 32  # ~ 32 MiB, expressed in B
 
         # magic bytes for originating network, char[4], 4b
-        # f9beb4d9 -> bytearray(b'\xf9\xbe\xb4\xd9')
-        magic_bytes = bytearray.fromhex(MAGIC)
+        magic_bytes = bytearray.fromhex(MAGIC)  # f9beb4d9 -> bytearray(b'\xf9\xbe\xb4\xd9')
 
         # command name, char[12], 12b, pad with \0s per spec
-        command_b = command.encode()
-        if len(command_b) < CMD_MAX_LEN:
-            command_b += ('\0' * (CMD_MAX_LEN - len(command_b))).encode()
+        if len(command) < CMD_MAX_LEN:
+            command += ('\0' * (CMD_MAX_LEN - len(command)))
+        command = command.encode()
 
         # payload size, uint32_t, 4b
-        payload_size_b = sys.getsizeof(payload)
-        if payload_size_b > MAX_PAYLOAD:
+        payload_size = sys.getsizeof(payload)
+        if payload_size > MAX_PAYLOAD:
             print('Payload size exceeds MAX_SIZE, msg may be dropped or rejected')
+        payload_size_b = ConvertTo.uint32_t(payload_size)
+
+        # if no payload
+        if payload is None:
+            payload = b'0x5df6e0e2'
 
         # checksum, first 4 bytes of SHA256(SHA256(payload)) char[4], 4b
-        if payload_size_b < 2:
-            checksum = '0x5df6e0e2'
-        else:
-            # call checksum
-            pass
+        checksum = self.double_sha256(payload)[0:4]
+        print('checksum', checksum.hex())
+        header = magic_bytes + command + payload_size_b + checksum
+        return header
 
+    def double_sha256(self, b):
+        """ Hashes byte object twice with SHA-256, returns hash
+        :param b: byte object to be double hashed
+        :returns: hashed(b)
+        """
+        first_hash = hashlib.sha256(b).digest()
+        second_hash = hashlib.sha256(first_hash).digest()
+        return second_hash
 
 
     def make_version_msg(self):
@@ -201,6 +230,9 @@ class Client(object):
 
         return version_msg
 
+    def make_msg(self, header_msg, msg):
+        return header_msg + msg
+
     @staticmethod
     def print_version_msg(b):
         """Prints formatted list of version_msg, where bytes shown in hex
@@ -249,11 +281,35 @@ class Client(object):
         if len(extra) > 0:
             print('{}{:32} EXTRA!!'.format(prefix, extra.hex()))
 
+    def print_header(self, header, expected_cksum=None):
+        """
+        Report the contents of the given bitcoin message header
+        :param header: bitcoin message header (bytes or bytearray)
+        :param expected_cksum: the expected checksum for this version message, if known
+        :return: message type
+        """
+        magic, command_hex, payload_size, cksum = header[:4], header[4:16], header[16:20], header[20:]
+        command = str(bytearray([b for b in command_hex if b != 0]), encoding='utf-8')
+        psz = ConvertTo.unmarshal_uint(payload_size)
+        if expected_cksum is None:
+            verified = ''
+        elif expected_cksum == cksum:
+            verified = '(verified)'
+        else:
+            verified = '(WRONG!! ' + expected_cksum.hex() + ')'
+        prefix = '  '
+        print(prefix + 'HEADER')
+        print(prefix + '-' * 56)
+        prefix *= 2
+        print('{}{:32} magic'.format(prefix, magic.hex()))
+        print('{}{:32} command: {}'.format(prefix, command_hex.hex(), command))
+        print('{}{:32} payload size: {}'.format(prefix, payload_size.hex(), psz))
+        print('{}{:32} checksum {}'.format(prefix, cksum.hex(), verified))
+        return command
+
 
 if __name__ == '__main__':
-    print('data')
+    print('Running client')
+    # init client
     cli = Client()
-    version_msg = cli.make_version_msg()
-    # cli.print_version_msg(version_msg)
-    cli.make_header_msg('version', version_msg)
-
+    cli.run_cli()
