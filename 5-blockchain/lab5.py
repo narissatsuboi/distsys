@@ -21,12 +21,12 @@ from datetime import datetime, date
 import calendar
 from time import strftime, gmtime
 
-BUF_SZ = 2_000_000
+BUF_SZ = 2_000_000  # b
 BITCOIN_HOST = '97.126.42.129'
 BITCOIN_PORT = 8333
 BITCOIN_CORE_VERSION = 70015
+HDR_SZ = 4 + 12 + 4 + 4  # b
 MAGIC = 'f9beb4d9'  # originating network for header
-
 
 
 class ConvertTo(object):
@@ -96,12 +96,6 @@ class ConvertTo(object):
     def unmarshal_uint(b):
         return int.from_bytes(b, byteorder='little', signed=False)
 
-class BTCCommands(Enum):
-    VERACK = 'verack'
-    GETBLOCKS = 'get_blocks'
-    INV = 'inv'  # inventory
-    GETDATA = 'getdata'
-    BLOCK = 'block'
 
 class Client(object):
 
@@ -116,15 +110,15 @@ class Client(object):
 
         # create version msg and header msg
         version_msg = self.make_version_msg()
-        header_msg = self.make_header_msg('version', version_msg)  #TODO make flexible
+        header_msg = self.make_header_msg('version', version_msg)  # TODO make
+        # flexible
 
         # create msg
-        self.make_msg(header_msg, version_msg)
 
         # print header msg and version msg
-        self.print_header(header_msg)
-        self.print_version_msg(version_msg)
-
+        # self.print_header(header_msg)
+        # self.print_version_msg(version_msg)
+        self.print_msg(header_msg + version_msg)
 
     @staticmethod
     def get_unix_epoch_time():
@@ -138,11 +132,12 @@ class Client(object):
         :param payload: byte str or byte array
         """
 
-        CMD_MAX_LEN = 12              # req'd byte len of encoded command
+        CMD_MAX_LEN = 12  # req'd byte len of encoded command
         MAX_PAYLOAD = 1_000_000 * 32  # ~ 32 MiB, expressed in B
 
         # magic bytes for originating network, char[4], 4b
-        magic_bytes = bytearray.fromhex(MAGIC)  # f9beb4d9 -> bytearray(b'\xf9\xbe\xb4\xd9')
+        magic_bytes = bytearray.fromhex(
+            MAGIC)  # f9beb4d9 -> bytearray(b'\xf9\xbe\xb4\xd9')
 
         # command name, char[12], 12b, pad with \0s per spec
         if len(command) < CMD_MAX_LEN:
@@ -160,20 +155,19 @@ class Client(object):
             payload = b'0x5df6e0e2'
 
         # checksum, first 4 bytes of SHA256(SHA256(payload)) char[4], 4b
-        checksum = self.double_sha256(payload)[0:4]
+        checksum = self.checksum(payload)
         print('checksum', checksum.hex())
         header = magic_bytes + command + payload_size_b + checksum
         return header
 
-    def double_sha256(self, b):
+    def checksum(self, b):
         """ Hashes byte object twice with SHA-256, returns hash
         :param b: byte object to be double hashed
         :returns: hashed(b)
         """
         first_hash = hashlib.sha256(b).digest()
         second_hash = hashlib.sha256(first_hash).digest()
-        return second_hash
-
+        return second_hash[0:4]
 
     def make_version_msg(self):
         """
@@ -182,7 +176,7 @@ class Client(object):
         file. Reference (3) for byte conversations and reference (4) to get unixtime.
         """
 
-        #TODO: IP AND PORT MAY NEED TO BE SWITCHED TO BIG END
+        # TODO: IP AND PORT MAY NEED TO BE SWITCHED TO BIG END
 
         # my protocol, int32_t, 4b
         version = ConvertTo.int32_t(BITCOIN_CORE_VERSION)
@@ -230,8 +224,15 @@ class Client(object):
 
         return version_msg
 
-    def make_msg(self, header_msg, msg):
-        return header_msg + msg
+    def print_msg(self, msg, text=None):
+        print('\n{}MESSAGE'.format('' if text is None else (text + ' ')))
+        print('({}) {}'.format(len(msg), msg[:60].hex() + ('' if len(msg) < 60 else
+                                                           '...')))
+        payload = msg[HDR_SZ:]
+        command = self.print_header(msg[:HDR_SZ], self.checksum(payload))
+        if command == 'version':
+            self.print_version_msg(payload)
+        # TODO PRINT VERACK
 
     @staticmethod
     def print_version_msg(b):
@@ -258,19 +259,23 @@ class Client(object):
         print(prefix + 'VERSION')
         print(prefix + '-' * 56)
         prefix *= 2
-        print('{}{:32} version {}'.format(prefix, version.hex(), ConvertTo.unmarshal_int(version)))
+        print('{}{:32} version {}'.format(prefix, version.hex(),
+                                          ConvertTo.unmarshal_int(version)))
         print('{}{:32} my services'.format(prefix, my_services.hex()))
         time_str = strftime("%a, %d %b %Y %H:%M:%S GMT",
                             gmtime(ConvertTo.unmarshal_int(epoch_time)))
         print('{}{:32} epoch time {}'.format(prefix, epoch_time.hex(), time_str))
         print('{}{:32} your services'.format(prefix, your_services.hex()))
         print(
-            '{}{:32} your host {}'.format(prefix, rec_host.hex(), ConvertTo.ipv6_to_ipv4(rec_host)))
+            '{}{:32} your host {}'.format(prefix, rec_host.hex(),
+                                          ConvertTo.ipv6_to_ipv4(rec_host)))
         print('{}{:32} your port {}'.format(prefix, rec_port.hex(),
                                             ConvertTo.unmarshal_uint(rec_port)))
         print('{}{:32} my services (again)'.format(prefix, my_services2.hex()))
-        print('{}{:32} my host {}'.format(prefix, my_host.hex(), ConvertTo.ipv6_to_ipv4(my_host)))
-        print('{}{:32} my port {}'.format(prefix, my_port.hex(), ConvertTo.unmarshal_uint(my_port)))
+        print('{}{:32} my host {}'.format(prefix, my_host.hex(),
+                                          ConvertTo.ipv6_to_ipv4(my_host)))
+        print('{}{:32} my port {}'.format(prefix, my_port.hex(),
+                                          ConvertTo.unmarshal_uint(my_port)))
         print('{}{:32} nonce'.format(prefix, nonce.hex()))
         print('{}{:32} user agent size {}'.format(prefix, user_agent_size.hex(), uasz))
         print('{}{:32} user agent \'{}\''.format(prefix, user_agent.hex(),
@@ -286,9 +291,11 @@ class Client(object):
         Report the contents of the given bitcoin message header
         :param header: bitcoin message header (bytes or bytearray)
         :param expected_cksum: the expected checksum for this version message, if known
-        :return: message type
+        :return: command type
         """
-        magic, command_hex, payload_size, cksum = header[:4], header[4:16], header[16:20], header[20:]
+        magic, command_hex, payload_size, cksum = header[:4], header[4:16], header[
+                                                                            16:20], header[
+                                                                                    20:]
         command = str(bytearray([b for b in command_hex if b != 0]), encoding='utf-8')
         psz = ConvertTo.unmarshal_uint(payload_size)
         if expected_cksum is None:
