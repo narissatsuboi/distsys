@@ -114,13 +114,14 @@ class Client(object):
 
         # version
         version_msg = self.make_version_msg()
-        version_hdr = self.make_header('version', version_msg)  # TODO make
+        version_hdr = self.make_header('version', version_msg)
         version = version_hdr + version_msg
 
         self.print_msg(version_hdr + version_msg, 'sending')
         response = self.message_node(version)
-        print(response)
-        
+        self.print_msg(response, 'received')
+        # print(response)
+
         # # verack (hdr only)
         # verack = self.make_header('verack')
         #
@@ -141,7 +142,16 @@ class Client(object):
             # s.settimeout(1500)
             s.connect((BITCOIN_HOST, BITCOIN_PORT))
             s.sendall(b)
-            return s.recv(BUF_SZ)
+            header = s.recv(HDR_SZ)
+            print('header', header)
+            payload_size = ConvertTo.unmarshal_uint(header[16:20])
+            if payload_size > 0:
+                payload = s.recv(payload_size)
+                print('payload_size', payload_size)
+                print('payload', payload)
+                return header + payload
+            else:
+                return header
 
     @staticmethod
     def get_unix_epoch_time():
@@ -259,7 +269,7 @@ class Client(object):
 
         return version + hashcount + hdr_hashes + stop_hash
 
-    def print_msg(self, msg, text=None):
+    def print_msg(self, msg, text=''):
         print('\n{}MESSAGE'.format('' if text is None else (text + ' ')))
         print('({}) {}'.format(len(msg), msg[:60].hex() + ('' if len(msg) < 60 else
                                                            '...')))
