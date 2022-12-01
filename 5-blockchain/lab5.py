@@ -11,6 +11,8 @@ https://docs.python.org/3/library/stdtypes.html#int.to_bytes
 (5) Max BTC buffer size -> https://github.com/nfj5/Distributed-Systems-CPSC5520-FQ19/blob
 /ddf90183ef6b4da09059af4c137e6004c8f49219/Lab5/lab5.py#L185
 (6) getblocks -> https://developer.bitcoin.org/reference/p2p_networking.html#getblocks
+(7) compactuint -> https://btcinformation.org/en/developer-reference#compactsize
+-unsigned-integers
 """
 
 import hashlib
@@ -117,7 +119,7 @@ class Client(object):
 
         # version
         version_msg = self.make_version_msg()
-        version_hdr = self.make_header('version', version_msg)
+        version_hdr = self.make_msg_header('version', version_msg)
         version = version_hdr + version_msg
         self.print_msg(version_hdr + version_msg, 'sending')
         s.sendall(version)
@@ -128,41 +130,56 @@ class Client(object):
         self.print_msg(header+payload, 'received')
 
         # verack (hdr only)
-        verack = self.make_header('verack')
+        verack = self.make_msg_header('verack')
         self.print_msg(verack, 'sending')
         s.sendall(verack)
         header = s.recv(HDR_SZ)
         # response = self.message_node(verack)
         self.print_msg(header, 'received')
+
         # # block
-        # block_msg = self.make_getblocks_msg()
-        # block_hdr = self.make_header('getblocks', block_msg)
-        # block = block_hdr + block_msg
-        #
-        # print header msg and version msg
+        block_msg = self.make_getblocks_msg()
+        block_hdr = self.make_msg_header('getblocks', block_msg)
+        block = block_hdr + block_msg
+        self.print_msg(block, 'sending')
+        header = s.recv(HDR_SZ)
+        payload_size = ConvertTo.unmarshal_uint(header[16:20])
+        payload = s.recv(32*500)
+        self.print_msg(header+payload, 'received')
+        # header = s.recv(HDR_SZ)
+        # payload_size = ConvertTo.unmarshal_uint(header[16:20])
+        # payload = s.recv(payload_size)
+        # self.print_msg(header+payload, 'received')
+        # header = s.recv(HDR_SZ)
+        # payload_size = ConvertTo.unmarshal_uint(header[16:20])
+        # payload = s.recv(payload_size)
+        # self.print_msg(header+payload, 'received')
+        # header = s.recv(HDR_SZ)
+        # payload_size = ConvertTo.unmarshal_uint(header[16:20])
+        # payload = s.recv(payload_size)
+        # self.print_msg(header+payload, 'received')
+        # header = s.recv(HDR_SZ)
+        # payload_size = ConvertTo.unmarshal_uint(header[16:20])
+        # payload = s.recv(payload_size)
+        # self.print_msg(header+payload, 'received')
 
-    def message_node(self, b):
-        """Sends message to BTC node and waits for response
-        :param b: bytes to send as msg
-        :returns: response from node
-        """
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.connect((BITCOIN_HOST, BITCOIN_PORT))
-            s.sendall(b)
-            header = s.recv(HDR_SZ)
-            payload_size = ConvertTo.unmarshal_uint(header[16:20])
-            if payload_size > 0:
-                payload = s.recv(payload_size)
-                return header + payload
-            else:
-                return header
+    # def message_node(self, b):
+    #     """Sends message to BTC node and waits for response
+    #     :param b: bytes to send as msg
+    #     :returns: response from node
+    #     """
+    #     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+    #         s.connect((BITCOIN_HOST, BITCOIN_PORT))
+    #         s.sendall(b)
+    #         header = s.recv(HDR_SZ)
+    #         payload_size = ConvertTo.unmarshal_uint(header[16:20])
+    #         if payload_size > 0:
+    #             payload = s.recv(payload_size)
+    #             return header + payload
+    #         else:
+    #             return header
 
-    @staticmethod
-    def get_unix_epoch_time():
-        d = datetime.utcnow()
-        return calendar.timegm(d.utctimetuple())
-
-    def make_header(self, command, payload=None):
+    def make_msg_header(self, command, payload=None):
         """ Determines header params and converts to bytes. Returns
         byte str of header information.
         :param command: bitcoin command to send to node
@@ -247,6 +264,7 @@ class Client(object):
 
         return version_msg
 
+    
     def make_getblocks_msg(self):
         """ Used to request an 'inv' msg from BTC node. Reference (6) for data sizes.
         :returns: inv msg in bytes
@@ -256,8 +274,9 @@ class Client(object):
         version = ConvertTo.int32_t(BITCOIN_CORE_VERSION)
 
         # hashcount, compactSizeuint
-        hashcount = ConvertTo.compactsize_t(2)
-
+        hashcount = ConvertTo.compactsize_t(1)
+        print('hashcount', hashcount)
+        print('len hashcount', len(hashcount))
         # block header hashes, char[32]
         hdr_hashes = bytearray(32)
 
@@ -274,6 +293,8 @@ class Client(object):
         command = self.print_header(msg[:HDR_SZ], self.checksum(payload))
         if command == 'version':
             self.print_version_msg(payload)
+        elif command == 'getblocks':
+            self.print_getblocks(payload)
 
     @staticmethod
     def print_version_msg(b):
@@ -354,6 +375,32 @@ class Client(object):
         print('{}{:32} payload size: {}'.format(prefix, payload_size.hex(), psz))
         print('{}{:32} checksum {}'.format(prefix, cksum.hex(), verified))
         return command
+
+
+    def print_getblocks(self, b):
+        """
+        :param b: get_blocks msg in bytes
+        """
+
+        version, count, header_hash, stop_hash = b[:4], b[4:5], b[5:37], b[37:]
+        # version, count, header_hash, stop_hash = b[:4], b[4:8], b[8:40], b[40:]
+
+
+        padding = '  '
+        print('count', count.hex())
+        print(padding + 'GETBLOCKS')
+        print(padding + '-' * 56)
+        padding *= 2
+        print('{}{:32} version {}'.format(padding, version.hex(), ConvertTo.unmarshal_int(
+            version)))
+        print('{}{:32} hashcount {}'.format(padding, count.hex(),
+                                        ConvertTo.unmarshal_compactsize(count)[1]))
+        print('{}{:32} header hash'.format(padding, header_hash.hex()[:32]))
+        print('{}{:32} stop hash'.format(padding, stop_hash.hex()[:32]))
+
+        print('FULL PAYLOAD', b.hex())
+
+
 
 
 if __name__ == '__main__':
