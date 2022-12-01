@@ -16,14 +16,15 @@ https://docs.python.org/3/library/stdtypes.html#int.to_bytes
 import hashlib
 import socket
 import sys
+import time
 from enum import Enum
 from socket import error as socket_error
-from datetime import datetime, date
+from datetime import datetime
 import calendar
 from time import strftime, gmtime
 
 BUF_SZ = 2_000_000  # b
-BITCOIN_HOST = '97.126.42.129'
+BITCOIN_HOST = '95.214.53.160'
 BITCOIN_PORT = 8333
 BITCOIN_CORE_VERSION = 70015
 HDR_SZ = 4 + 12 + 4 + 4  # b
@@ -59,6 +60,7 @@ class ConvertTo(object):
     @staticmethod
     def ipv6_from_ipv4(ipv4_str):
         pchIPv4 = bytearray([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff])
+        # return pchIPv4 + bytearray((int(x) for x in ipv4_str.split('.')))
         return pchIPv4 + bytearray((int(x) for x in ipv4_str.split('.')))
 
     @staticmethod
@@ -102,7 +104,7 @@ class Client(object):
 
     def __init__(self, block_num):
         self.block_num = block_num % 10000
-        self.host, self.port = '127.0. 0.1', 59550
+        self.host, self.port = '127.0.0.1', 59550
         self.addr = (self.host, self.port)
 
     def run_cli(self):
@@ -115,19 +117,20 @@ class Client(object):
         version_hdr = self.make_header('version', version_msg)  # TODO make
         version = version_hdr + version_msg
 
-        # verack (hdr only)
-        verack = self.make_header('verack')
-
-        # block
-        block_msg = self.make_getblocks_msg()
-        block_hdr = self.make_header('getblocks', block_msg)
-        block = block_hdr + block_msg
-
-        # print header msg and version msg
         self.print_msg(version_hdr + version_msg, 'sending')
-
         response = self.message_node(version)
         print(response)
+        
+        # # verack (hdr only)
+        # verack = self.make_header('verack')
+        #
+        # # block
+        # block_msg = self.make_getblocks_msg()
+        # block_hdr = self.make_header('getblocks', block_msg)
+        # block = block_hdr + block_msg
+        #
+        # print header msg and version msg
+
 
     def message_node(self, b):
         """Sends message to BTC node and waits for response
@@ -151,21 +154,18 @@ class Client(object):
         :param command: bitcoin command to send to node
         :param payload: byte str or byte array
         """
-
         CMD_MAX_LEN = 12  # req'd byte len of encoded command
-        MAX_PAYLOAD = 1_000_000 * 32  # ~ 32 MiB, expressed in B
+        MAX_PAYLOAD = 1_000_000 * 32  # ~ 32 MiB, expressed in b
 
         # magic bytes for originating network, char[4], 4b
-        magic_bytes = bytearray.fromhex(
-            MAGIC)  # f9beb4d9 -> bytearray(b'\xf9\xbe\xb4\xd9')
-
+        start_string = bytearray.fromhex(MAGIC)  # f9beb4d9 -> bytearray(b'\xf9\xbe\xb4\xd9')
         # command name, char[12], 12b, pad with \0s per spec
         if len(command) < CMD_MAX_LEN:
             command += ('\0' * (CMD_MAX_LEN - len(command)))
         command = command.encode()
 
         # payload size, uint32_t, 4b
-        payload_size = sys.getsizeof(payload)
+        payload_size = len(payload)
         if payload_size > MAX_PAYLOAD:
             print('Payload size exceeds MAX_SIZE, msg may be dropped or rejected')
         payload_size_b = ConvertTo.uint32_t(payload_size)
@@ -173,10 +173,9 @@ class Client(object):
         # if no payload
         if payload is None:
             payload = b'0x5df6e0e2'
-
         # checksum, first 4 bytes of SHA256(SHA256(payload)) char[4], 4b
         checksum = self.checksum(payload)
-        header = magic_bytes + command + payload_size_b + checksum
+        header = start_string + command + payload_size_b + checksum
         return header
 
     def checksum(self, b):
@@ -190,12 +189,10 @@ class Client(object):
 
     def make_version_msg(self):
         """
-        Creates the version msg that will be sent to the bitcoin node to init TCP
-        handshake. Recipe for version message from reference (1) in the header of this
-        file. Reference (3) for byte conversations and reference (4) to get unixtime.
+        Creates the version msg that will be sent to the bitcoin node. Recipe for version
+        message from reference (1). Reference (3) for byte conversations and
+        reference (4) to get unixtime.
         """
-
-        # TODO: IP AND PORT MAY NEED TO BE SWITCHED TO BIG END
 
         # my protocol, int32_t, 4b
         version = ConvertTo.int32_t(BITCOIN_CORE_VERSION)
@@ -204,7 +201,7 @@ class Client(object):
         services = ConvertTo.uint64_t(0)
 
         # my unix epoch time, int64_t, 8b
-        timestamp = ConvertTo.int64_t(self.get_unix_epoch_time())
+        timestamp = ConvertTo.int64_t(int(time.time()))
 
         # host's services (assume 0x01), uint64_t, 8b
         addr_recv_services = ConvertTo.uint64_t(1)
@@ -228,7 +225,7 @@ class Client(object):
         nonce = ConvertTo.uint64_t(0)
 
         # compactSizeuint, user_agent_bytes -> 0, 4b
-        compactSizeuint = ConvertTo.compactsize_t(0)
+        user_agent_bytes = ConvertTo.compactsize_t(0)
 
         # start_height -> 0, int32_t, 4b
         start_height = ConvertTo.int32_t(0)
@@ -238,7 +235,7 @@ class Client(object):
 
         version_msg = version + services + timestamp + addr_recv_services + \
                       addr_recv_ip_addr + addr_recv_port + addr_trans_services + \
-                      addr_trans_ip_addr + addr_trans_port + nonce + compactSizeuint + \
+                      addr_trans_ip_addr + addr_trans_port + nonce + user_agent_bytes + \
                       start_height + relay
 
         return version_msg
