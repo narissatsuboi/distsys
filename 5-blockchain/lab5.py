@@ -112,19 +112,28 @@ class Client(object):
 
         """
 
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.connect((BITCOIN_HOST, BITCOIN_PORT))
+
         # version
         version_msg = self.make_version_msg()
         version_hdr = self.make_header('version', version_msg)
         version = version_hdr + version_msg
-
         self.print_msg(version_hdr + version_msg, 'sending')
-        response = self.message_node(version)
-        self.print_msg(response, 'received')
-        # print(response)
+        s.sendall(version)
+        header = s.recv(HDR_SZ)
+        payload_size = ConvertTo.unmarshal_uint(header[16:20])
+        payload = s.recv(payload_size)
+        # response = self.message_node(version)
+        self.print_msg(header+payload, 'received')
 
-        # # verack (hdr only)
-        # verack = self.make_header('verack')
-        #
+        # verack (hdr only)
+        verack = self.make_header('verack')
+        self.print_msg(verack, 'sending')
+        s.sendall(verack)
+        header = s.recv(HDR_SZ)
+        # response = self.message_node(verack)
+        self.print_msg(header, 'received')
         # # block
         # block_msg = self.make_getblocks_msg()
         # block_hdr = self.make_header('getblocks', block_msg)
@@ -132,23 +141,18 @@ class Client(object):
         #
         # print header msg and version msg
 
-
     def message_node(self, b):
         """Sends message to BTC node and waits for response
         :param b: bytes to send as msg
         :returns: response from node
         """
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            # s.settimeout(1500)
             s.connect((BITCOIN_HOST, BITCOIN_PORT))
             s.sendall(b)
             header = s.recv(HDR_SZ)
-            print('header', header)
             payload_size = ConvertTo.unmarshal_uint(header[16:20])
             if payload_size > 0:
                 payload = s.recv(payload_size)
-                print('payload_size', payload_size)
-                print('payload', payload)
                 return header + payload
             else:
                 return header
@@ -165,7 +169,6 @@ class Client(object):
         :param payload: byte str or byte array
         """
         CMD_MAX_LEN = 12  # req'd byte len of encoded command
-        MAX_PAYLOAD = 1_000_000 * 32  # ~ 32 MiB, expressed in b
 
         # magic bytes for originating network, char[4], 4b
         start_string = bytearray.fromhex(MAGIC)  # f9beb4d9 -> bytearray(b'\xf9\xbe\xb4\xd9')
@@ -174,18 +177,12 @@ class Client(object):
             command += ('\0' * (CMD_MAX_LEN - len(command)))
         command = command.encode()
 
-        # payload size, uint32_t, 4b
-        payload_size = len(payload)
-        if payload_size > MAX_PAYLOAD:
-            print('Payload size exceeds MAX_SIZE, msg may be dropped or rejected')
-        payload_size_b = ConvertTo.uint32_t(payload_size)
-
         # if no payload
         if payload is None:
-            payload = b'0x5df6e0e2'
-        # checksum, first 4 bytes of SHA256(SHA256(payload)) char[4], 4b
+            payload = ''.encode()
+        payload_size_bytes = ConvertTo.uint32_t(len(payload))
         checksum = self.checksum(payload)
-        header = start_string + command + payload_size_b + checksum
+        header = start_string + command + payload_size_bytes + checksum
         return header
 
     def checksum(self, b):
@@ -277,7 +274,6 @@ class Client(object):
         command = self.print_header(msg[:HDR_SZ], self.checksum(payload))
         if command == 'version':
             self.print_version_msg(payload)
-        # TODO PRINT VERACK
 
     @staticmethod
     def print_version_msg(b):
