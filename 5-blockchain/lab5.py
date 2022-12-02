@@ -41,11 +41,15 @@ BTC_HASH_MERKLE_ROOT = bytes.fromhex('4a5e1e4baab89f3a32518a88c31bc87f618f76673e
 
 
 class Conversion(object):
+    """ Helper class for byte and unit conversions. All int conversions are little
+    endian. """
+
     @staticmethod
     def swap_endianness(b):
-        """ Swaps the endianness of a byte array
-        :param b: bytearray
-        :returns: swapped endianess of byte array
+        """
+        Swaps the endianness of a byte array, little to big or big to little.
+        :param b: bytes or bytearray
+        :return: bytearray of swapped endianness
         """
         b = bytearray.fromhex(b.hex())
         b.reverse()
@@ -53,6 +57,11 @@ class Conversion(object):
 
     @staticmethod
     def compactsize_t(n):
+        """
+        Converts an integer into a compact uint.
+        :param n: integer
+        :return: compactuint
+        """
         if n < 252:
             return Conversion.uint8_t(n)
         if n < 0xffff:
@@ -63,6 +72,11 @@ class Conversion(object):
 
     @staticmethod
     def unmarshal_compactsize(b):
+        """
+        Converts a compact uint to an uint.
+        :param b: bytes or bytearray
+        :return: uint
+        """
         key = b[0]
         if key == 0xff:
             return b[0:9], Conversion.unmarshal_uint(b[1:9])
@@ -74,48 +88,103 @@ class Conversion(object):
 
     @staticmethod
     def bool_t(flag):
+        """
+        Converts bool to 8 bit uint.
+        :param flag: bool
+        :return: uint8
+        """
         return Conversion.uint8_t(1 if flag else 0)
 
     @staticmethod
     def ipv6_from_ipv4(ipv4_str):
+        """
+        Maps an ipv4 address expressed as a string to ipv6 format.
+        :param ipv4_str: string expression of ipv4 address
+        :return: string expression of ipv6 address
+        """
         pchIPv4 = bytearray([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff])
         # return pchIPv4 + bytearray((int(x) for x in ipv4_str.split('.')))
         return pchIPv4 + bytearray((int(x) for x in ipv4_str.split('.')))
 
     @staticmethod
     def ipv6_to_ipv4(ipv6):
+        """
+        Maps an ipv6 address expressed as a string to ipv4 format.
+        :param ipv6_str: string expression of ipv6 address
+        :return: string expression of ipv4 address
+        """
         return '.'.join([str(b) for b in ipv6[12:]])
 
     @staticmethod
     def uint8_t(n):
+        """
+        Converts a value to 8-bit unsigned byte string.
+        :param n: int
+        :return: uint8
+        """
         return int(n).to_bytes(1, byteorder='little', signed=False)
 
     @staticmethod
     def uint16_t(n):
+        """
+        Converts a value to 16-bit unsigned byte string.
+        :param n: int
+        :return: uint16
+        """
         return int(n).to_bytes(2, byteorder='little', signed=False)
 
     @staticmethod
     def int32_t(n):
+        """
+        Converts a value to 32-bit signed byte string.
+        :param n: int
+        :return: int32
+        """
         return int(n).to_bytes(4, byteorder='little', signed=True)
 
     @staticmethod
     def uint32_t(n):
+        """
+        Converts a value to 32-bit unsigned byte string.
+        :param n: int
+        :return: uint32
+        """
         return int(n).to_bytes(4, byteorder='little', signed=False)
 
     @staticmethod
     def int64_t(n):
+        """
+        Converts a value to 64-bit signed byte string.
+        :param n: int
+        :return: int64
+        """
         return int(n).to_bytes(8, byteorder='little', signed=True)
 
     @staticmethod
     def uint64_t(n):
+        """
+        Converts a value to 64-bit unsigned byte string.
+        :param n: int
+        :return: uint64
+        """
         return int(n).to_bytes(8, byteorder='little', signed=False)
 
     @staticmethod
     def unmarshal_int(b):
+        """
+        Converts bytes to signed integer.
+        :param b: bytes
+        :return: int
+        """
         return int.from_bytes(b, byteorder='little', signed=True)
 
     @staticmethod
     def unmarshal_uint(b):
+        """
+        Converts bytes to unsigned integer.
+        :param b: bytes
+        :return: int
+        """
         return int.from_bytes(b, byteorder='little', signed=False)
 
 
