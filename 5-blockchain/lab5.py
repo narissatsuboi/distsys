@@ -13,6 +13,10 @@ https://docs.python.org/3/library/stdtypes.html#int.to_bytes
 (6) getblocks -> https://developer.bitcoin.org/reference/p2p_networking.html#getblocks
 (7) compactuint -> https://btcinformation.org/en/developer-reference#compactsize
 -unsigned-integers
+(8) block header -> https://btcinformation.org/en/developer-reference#compactsize-unsigned-integers
+block zero -> https://en.bitcoin.it/wiki/Genesis_block
+swap endian -> https://www.folkstalk.com/2022/10/python-little-endian-to-big-endian-with
+-code-examples.html
 """
 
 import hashlib
@@ -26,14 +30,28 @@ import calendar
 from time import strftime, gmtime
 
 BUF_SZ = 2_000_000  # b
-BITCOIN_HOST = '95.214.53.160'
-BITCOIN_PORT = 8333
-BITCOIN_CORE_VERSION = 70015
+BTC_HOST = '95.214.53.160'
+BTC_PORT = 8333
+BTC_CORE_VERSION = 70015
 HDR_SZ = 4 + 12 + 4 + 4  # b
 MAGIC = 'f9beb4d9'  # originating network for header
+TIME = int(time.time())
+# BTC_HASH_BLOCK_ZERO = bytes.fromhex('000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f')
+BTC_HASH_BLOCK_ZERO = bytes.fromhex('000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f')
 
-
+BTC_HASH_MERKLE_ROOT = bytes.fromhex('4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b')
 class ConvertTo(object):
+
+    @staticmethod
+    def swap_endianness(b):
+        """ Swaps the endianness of a byte array
+        :param b: bytearray
+        :returns: swapped endianess of byte array expressed in hex
+        """
+        b = bytearray.fromhex(b.hex())
+        b.reverse()
+        return b
+
     @staticmethod
     def compactsize_t(n):
         if n < 252:
@@ -115,7 +133,7 @@ class Client(object):
         """
 
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.connect((BITCOIN_HOST, BITCOIN_PORT))
+        s.connect((BTC_HOST, BTC_PORT))
 
         # version
         version_msg = self.make_version_msg()
@@ -203,13 +221,22 @@ class Client(object):
         return header
 
     def checksum(self, b):
+        """ Hashes byte object twice with SHA-256, returns last 4 digits
+        :param b: byte object to be double hashed
+        :returns: hashed(b)[0:4]
+        """
+        first_hash = hashlib.sha256(b).digest()
+        second_hash = hashlib.sha256(first_hash).digest()
+        return second_hash[0:4]
+
+    def double_sha256(self, b):
         """ Hashes byte object twice with SHA-256, returns hash
         :param b: byte object to be double hashed
         :returns: hashed(b)
         """
         first_hash = hashlib.sha256(b).digest()
         second_hash = hashlib.sha256(first_hash).digest()
-        return second_hash[0:4]
+        return second_hash
 
     def make_version_msg(self):
         """
@@ -219,7 +246,7 @@ class Client(object):
         """
 
         # my protocol, int32_t, 4b
-        version = ConvertTo.int32_t(BITCOIN_CORE_VERSION)
+        version = ConvertTo.int32_t(BTC_CORE_VERSION)
 
         # my services, uint64_t, 8b
         services = ConvertTo.uint64_t(0)
@@ -231,10 +258,10 @@ class Client(object):
         addr_recv_services = ConvertTo.uint64_t(1)
 
         # host's addr IPv6 or IPv4 mapped IPv6 16b, char[16], big end
-        addr_recv_ip_addr = ConvertTo.ipv6_from_ipv4(BITCOIN_HOST)
+        addr_recv_ip_addr = ConvertTo.ipv6_from_ipv4(BTC_HOST)
 
         # host's port, uint16_t,big end, 2b
-        addr_recv_port = ConvertTo.uint16_t(BITCOIN_PORT)
+        addr_recv_port = ConvertTo.uint16_t(BTC_PORT)
 
         # addr_trans servs, same as services above, uint64_t, 8b
         addr_trans_services = services
@@ -264,24 +291,55 @@ class Client(object):
 
         return version_msg
 
-    
+    def make_block_header(self):
+        """ Returns block header
+
+        """
+        # block version, int32_t, 4b
+        block_version = ConvertTo.int32_t(4)
+        # prev block header, char[32], 32b
+        # prev_block_header_hash = self.double_sha256(''.encode())
+        # print('sys size', sys.getsizeof(prev_block_header_hash))
+        # prev_block_header_hash = self.double_sha256(bytearray(32))
+        prev_block_header_hash = BTC_HASH_BLOCK_ZERO
+
+        # merkle root hash, char[32], 32b
+        merkle_root_hash = prev_block_header_hash
+        # time, uint32_t, 4b
+        time = ConvertTo.uint32_t(TIME)
+        # nBits, uint32_t, 4b
+        nbits = ConvertTo.uint32_t(0)
+        # nonce, uint32_t, 4b
+        nonce = ConvertTo.uint32_t(0)
+
+        # print('block version', block_version)
+        print('prev block header hash', prev_block_header_hash)
+        # print('merkle_root_hash', merkle_root_hash)
+        # print('time', time)
+        # print('nbits', nbits, nbits.hex())
+        # print('nonce', nonce, nonce.hex())
+        block_header_hash = block_version + prev_block_header_hash + merkle_root_hash + time + nbits\
+               + nonce
+        print('blockheaderhash', block_header_hash, sys.getsizeof(block_header_hash))
+        return block_header_hash
+
+
     def make_getblocks_msg(self):
         """ Used to request an 'inv' msg from BTC node. Reference (6) for data sizes.
         :returns: inv msg in bytes
         """
 
         # version, uint32_t, 4b
-        version = ConvertTo.int32_t(BITCOIN_CORE_VERSION)
+        version = ConvertTo.int32_t(BTC_CORE_VERSION)
 
         # hashcount, compactSizeuint
         hashcount = ConvertTo.compactsize_t(1)
         print('hashcount', hashcount)
         print('len hashcount', len(hashcount))
         # block header hashes, char[32]
-        hdr_hashes = bytearray(32)
-
-        # stop hash, char[32], 32
-        stop_hash = bytearray(32)
+        # hdr_hashes = bytearray(32)
+        hdr_hashes = ConvertTo.swap_endianness(BTC_HASH_BLOCK_ZERO)
+        stop_hash = self.double_sha256(bytearray(32))
 
         return version + hashcount + hdr_hashes + stop_hash
 
@@ -397,11 +455,6 @@ class Client(object):
                                         ConvertTo.unmarshal_compactsize(count)[1]))
         print('{}{:32} header hash'.format(padding, header_hash.hex()[:32]))
         print('{}{:32} stop hash'.format(padding, stop_hash.hex()[:32]))
-
-        print('FULL PAYLOAD', b.hex())
-
-
-
 
 if __name__ == '__main__':
     print('Running client')
