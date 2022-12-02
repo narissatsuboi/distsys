@@ -29,15 +29,23 @@ from datetime import datetime
 import calendar
 from time import strftime, gmtime
 
-BUF_SZ = 2_000_000  # b
-BTC_HOST = '95.214.53.160'
-BTC_PORT = 8333
+# networking globals
+CLI_HOST, CLI_PORT = '127.0.0.1', 59550  # requestor addr
+BTC_HOST, BTC_PORT = '95.214.53.160', 8333  # sync node addr
+CLI_ADDR, BTC_ADDR = (CLI_HOST, CLI_PORT), (BTC_HOST, BTC_PORT)
+MAX_BUF_SZ = 2_000_000  # b
+
+# btc protocol globals
+MSG_HDR_SZ = 24  # b
 BTC_CORE_VERSION = 70015
-HDR_SZ = 4 + 12 + 4 + 4  # b
-MAGIC = 'f9beb4d9'  # originating network for header
+MAINNET = 'f9beb4d9'
 TIME = int(time.time())
-BTC_HASH_BLOCK_ZERO = bytes.fromhex('000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f')
-BTC_HASH_MERKLE_ROOT = bytes.fromhex('4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b')
+
+# block 0 globals
+BTC_HASH_BLOCK_ZERO = bytes.fromhex(
+    '000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f')
+BTC_HASH_MERKLE_ROOT = bytes.fromhex(
+    '4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b')
 
 
 class Conversion(object):
@@ -192,8 +200,6 @@ class Client(object):
 
     def __init__(self, block_num):
         self.block_num = block_num % 10000
-        self.host, self.port = '127.0.0.1', 59550
-        self.addr = (self.host, self.port)
 
     def run_cli(self):
         """
@@ -209,17 +215,17 @@ class Client(object):
         version = version_hdr + version_msg
         self.print_msg(version_hdr + version_msg, 'sending')
         s.sendall(version)
-        header = s.recv(HDR_SZ)
+        header = s.recv(MSG_HDR_SZ)
         payload_size = Conversion.unmarshal_uint(header[16:20])
         payload = s.recv(payload_size)
         # response = self.message_node(version)
-        self.print_msg(header+payload, 'received')
+        self.print_msg(header + payload, 'received')
 
         # verack (hdr only)
         verack = self.make_msg_header('verack')
         self.print_msg(verack, 'sending')
         s.sendall(verack)
-        header = s.recv(HDR_SZ)
+        header = s.recv(MSG_HDR_SZ)
         # response = self.message_node(verack)
         self.print_msg(header, 'received')
 
@@ -229,24 +235,24 @@ class Client(object):
         block = block_hdr + block_msg
         self.print_msg(block, 'sending')
         s.sendall(block_msg)
-        header = s.recv(HDR_SZ)
+        header = s.recv(MSG_HDR_SZ)
         payload_size = Conversion.unmarshal_uint(header[16:20])
         payload = s.recv(payload_size)
-        self.print_msg(header+payload, 'received')
+        self.print_msg(header + payload, 'received')
 
         self.print_msg(block, 'sending')
         s.sendall(block_msg)
-        header = s.recv(HDR_SZ)
+        header = s.recv(MSG_HDR_SZ)
         payload_size = Conversion.unmarshal_uint(header[16:20])
         payload = s.recv(payload_size)
-        self.print_msg(header+payload, 'received')
+        self.print_msg(header + payload, 'received')
 
         self.print_msg(block, 'sending')
         s.sendall(block_msg)
-        header = s.recv(HDR_SZ)
+        header = s.recv(MSG_HDR_SZ)
         payload_size = Conversion.unmarshal_uint(header[16:20])
         payload = s.recv(payload_size)
-        self.print_msg(header+payload, 'received')
+        self.print_msg(header + payload, 'received')
 
     def make_msg_header(self, command, payload=None):
         """ Determines header params and converts to bytes. Returns
@@ -257,7 +263,8 @@ class Client(object):
         CMD_MAX_LEN = 12  # req'd byte len of encoded command
 
         # magic bytes for originating network, char[4], 4b
-        start_string = bytearray.fromhex(MAGIC)  # f9beb4d9 -> bytearray(b'\xf9\xbe\xb4\xd9')
+        start_string = bytearray.fromhex(
+            MAINNET)  # f9beb4d9 -> bytearray(b'\xf9\xbe\xb4\xd9')
         # command name, char[12], 12b, pad with \0s per spec
         if len(command) < CMD_MAX_LEN:
             command += ('\0' * (CMD_MAX_LEN - len(command)))
@@ -318,10 +325,10 @@ class Client(object):
         addr_trans_services = services
 
         # my IPv6 or IPv4 mapped IPv6, char[16], big end, 16b
-        addr_trans_ip_addr = Conversion.ipv6_from_ipv4(self.host)
+        addr_trans_ip_addr = Conversion.ipv6_from_ipv4(CLI_HOST)
 
         # my port, uint16_t, big end, 2b
-        addr_trans_port = Conversion.uint16_t(self.port)
+        addr_trans_port = Conversion.uint16_t(CLI_PORT)
 
         # nonce, uint64_t, 8b
         nonce = Conversion.uint64_t(0)
@@ -369,11 +376,10 @@ class Client(object):
         # print('time', time)
         # print('nbits', nbits, nbits.hex())
         # print('nonce', nonce, nonce.hex())
-        block_header_hash = block_version + prev_block_header_hash + merkle_root_hash + time + nbits\
-               + nonce
+        block_header_hash = block_version + prev_block_header_hash + merkle_root_hash + time + nbits \
+                            + nonce
         print('blockheaderhash', block_header_hash, sys.getsizeof(block_header_hash))
         return block_header_hash
-
 
     def make_getblocks_msg(self):
         """ Used to request an 'inv' msg from BTC node. Reference (6) for data sizes.
@@ -392,8 +398,8 @@ class Client(object):
         print('\n{}MESSAGE'.format('' if text is None else (text + ' ')))
         print('({}) {}'.format(len(msg), msg[:60].hex() + ('' if len(msg) < 60 else
                                                            '...')))
-        payload = msg[HDR_SZ:]
-        command = self.print_header(msg[:HDR_SZ], self.checksum(payload))
+        payload = msg[MSG_HDR_SZ:]
+        command = self.print_header(msg[:MSG_HDR_SZ], self.checksum(payload))
         if command == 'version':
             self.print_version_msg(payload)
         elif command == 'getblocks':
@@ -479,7 +485,6 @@ class Client(object):
         print('{}{:32} checksum {}'.format(prefix, cksum.hex(), verified))
         return command
 
-
     def print_getblocks(self, b):
         """
         :param b: get_blocks msg in bytes
@@ -488,18 +493,19 @@ class Client(object):
         version, count, header_hash, stop_hash = b[:4], b[4:5], b[5:37], b[37:]
         # version, count, header_hash, stop_hash = b[:4], b[4:8], b[8:40], b[40:]
 
-
         padding = '  '
         print('count', count.hex())
         print(padding + 'GETBLOCKS')
         print(padding + '-' * 56)
         padding *= 2
-        print('{}{:32} version {}'.format(padding, version.hex(), Conversion.unmarshal_int(
-            version)))
+        print(
+            '{}{:32} version {}'.format(padding, version.hex(), Conversion.unmarshal_int(
+                version)))
         print('{}{:32} hashcount {}'.format(padding, count.hex(),
                                             Conversion.unmarshal_compactsize(count)[1]))
         print('{}{:32} header hash'.format(padding, header_hash.hex()[:32]))
         print('{}{:32} stop hash'.format(padding, stop_hash.hex()[:32]))
+
 
 if __name__ == '__main__':
     print('Running client')
