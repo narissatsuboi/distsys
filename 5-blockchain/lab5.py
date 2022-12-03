@@ -48,7 +48,7 @@ BTC_HASH_MERKLE_ROOT = bytes.fromhex(
     '4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b')
 
 
-class Conversion(object):
+class Convert(object):
     """ Helper class for byte and unit conversions. All int conversions are little
     endian. """
 
@@ -71,12 +71,12 @@ class Conversion(object):
         :return: compactuint
         """
         if n < 252:
-            return Conversion.uint8_t(n)
+            return Convert.uint8_t(n)
         if n < 0xffff:
-            return Conversion.uint8_t(0xfd) + Conversion.uint16_t(n)
+            return Convert.uint8_t(0xfd) + Convert.uint16_t(n)
         if n < 0xffffffff:
-            return Conversion.uint8_t(0xfe) + Conversion.uint32_t(n)
-        return Conversion.uint8_t(0xff) + Conversion.uint64_t(n)
+            return Convert.uint8_t(0xfe) + Convert.uint32_t(n)
+        return Convert.uint8_t(0xff) + Convert.uint64_t(n)
 
     @staticmethod
     def unmarshal_compactsize(b):
@@ -87,12 +87,12 @@ class Conversion(object):
         """
         key = b[0]
         if key == 0xff:
-            return b[0:9], Conversion.unmarshal_uint(b[1:9])
+            return b[0:9], Convert.unmarshal_uint(b[1:9])
         if key == 0xfe:
-            return b[0:5], Conversion.unmarshal_uint(b[1:5])
+            return b[0:5], Convert.unmarshal_uint(b[1:5])
         if key == 0xfd:
-            return b[0:3], Conversion.unmarshal_uint(b[1:3])
-        return b[0:1], Conversion.unmarshal_uint(b[0:1])
+            return b[0:3], Convert.unmarshal_uint(b[1:3])
+        return b[0:1], Convert.unmarshal_uint(b[0:1])
 
     @staticmethod
     def bool_t(flag):
@@ -101,7 +101,7 @@ class Conversion(object):
         :param flag: bool
         :return: uint8
         """
-        return Conversion.uint8_t(1 if flag else 0)
+        return Convert.uint8_t(1 if flag else 0)
 
     @staticmethod
     def ipv6_from_ipv4(ipv4_str):
@@ -197,6 +197,11 @@ class Conversion(object):
 
 
 class Cli(object):
+    """
+    Static function class to connect to a bitcoin node.
+    """
+
+    """ MAKE HEADER OR MESSAGE ------------------------------------------------------ """
 
     @staticmethod
     def make_msg_header(command, payload=None):
@@ -218,10 +223,113 @@ class Cli(object):
         # if no payload
         if payload is None:
             payload = ''.encode()
-        payload_size_bytes = Conversion.uint32_t(len(payload))
+        payload_size_bytes = Convert.uint32_t(len(payload))
         checksum = Cli.checksum(payload)
         header = start_string + command + payload_size_bytes + checksum
         return header
+
+    @staticmethod
+    def make_block_header():
+        """ Returns block header
+
+        """
+        # block version, int32_t, 4b
+        block_version = Convert.int32_t(4)
+        # prev block header, char[32], 32b
+        # prev_block_header_hash = self.double_sha256(''.encode())
+        # print('sys size', sys.getsizeof(prev_block_header_hash))
+        # prev_block_header_hash = self.double_sha256(bytearray(32))
+        prev_block_header_hash = BTC_HASH_BLOCK_ZERO
+
+        # merkle root hash, char[32], 32b
+        merkle_root_hash = prev_block_header_hash
+        # time, uint32_t, 4b
+        time = Convert.uint32_t(TIME)
+        # nBits, uint32_t, 4b
+        nbits = Convert.uint32_t(0)
+        # nonce, uint32_t, 4b
+        nonce = Convert.uint32_t(0)
+
+        # print('block version', block_version)
+        print('prev block header hash', prev_block_header_hash)
+        # print('merkle_root_hash', merkle_root_hash)
+        # print('time', time)
+        # print('nbits', nbits, nbits.hex())
+        # print('nonce', nonce, nonce.hex())
+        block_header_hash = block_version + prev_block_header_hash + merkle_root_hash + time + nbits \
+                            + nonce
+        print('blockheaderhash', block_header_hash, sys.getsizeof(block_header_hash))
+        return block_header_hash
+
+    @staticmethod
+    def make_version_msg():
+        """
+        Creates the version msg that will be sent to the bitcoin node. Recipe for version
+        message from reference (1). Reference (3) for byte conversations and
+        reference (4) to get unixtime.
+        """
+
+        # my protocol, int32_t, 4b
+        version = Convert.int32_t(BTC_CORE_VERSION)
+
+        # my services, uint64_t, 8b
+        services = Convert.uint64_t(0)
+
+        # my unix epoch time, int64_t, 8b
+        timestamp = Convert.int64_t(int(time.time()))
+
+        # host's services (assume 0x01), uint64_t, 8b
+        addr_recv_services = Convert.uint64_t(1)
+
+        # host's addr IPv6 or IPv4 mapped IPv6 16b, char[16], big end
+        addr_recv_ip_addr = Convert.ipv6_from_ipv4(BTC_HOST)
+
+        # host's port, uint16_t,big end, 2b
+        addr_recv_port = Convert.uint16_t(BTC_PORT)
+
+        # addr_trans servs, same as services above, uint64_t, 8b
+        addr_trans_services = services
+
+        # my IPv6 or IPv4 mapped IPv6, char[16], big end, 16b
+        addr_trans_ip_addr = Convert.ipv6_from_ipv4(CLI_HOST)
+
+        # my port, uint16_t, big end, 2b
+        addr_trans_port = Convert.uint16_t(CLI_PORT)
+
+        # nonce, uint64_t, 8b
+        nonce = Convert.uint64_t(0)
+
+        # compactSizeuint, user_agent_bytes -> 0, 4b
+        user_agent_bytes = Convert.compactsize_t(0)
+
+        # start_height -> 0, int32_t, 4b
+        start_height = Convert.int32_t(0)
+
+        # relay -> False
+        relay = Convert.bool_t(False)
+
+        version_msg = version + services + timestamp + addr_recv_services + \
+                      addr_recv_ip_addr + addr_recv_port + addr_trans_services + \
+                      addr_trans_ip_addr + addr_trans_port + nonce + user_agent_bytes + \
+                      start_height + relay
+
+        return version_msg
+
+    @staticmethod
+    def make_getblocks_msg():
+        """ Used to request an 'inv' msg from BTC node. Reference (6) for data sizes.
+        :returns: inv msg in bytes
+        """
+
+        version = Convert.uint32_t(BTC_CORE_VERSION)
+        hashcount = Convert.compactsize_t(1)
+        hdr_hashes = Convert.swap_endianness(BTC_HASH_BLOCK_ZERO)
+        print('hdr_hashes', hdr_hashes)
+        stop_hash = bytearray(32)
+
+        return version + hashcount + hdr_hashes + stop_hash
+
+    """ UTILS ----------------------------------------------------------------------- """
 
     @staticmethod
     def checksum(b):
@@ -243,106 +351,7 @@ class Cli(object):
         second_hash = hashlib.sha256(first_hash).digest()
         return second_hash
 
-    @staticmethod
-    def make_version_msg():
-        """
-        Creates the version msg that will be sent to the bitcoin node. Recipe for version
-        message from reference (1). Reference (3) for byte conversations and
-        reference (4) to get unixtime.
-        """
-
-        # my protocol, int32_t, 4b
-        version = Conversion.int32_t(BTC_CORE_VERSION)
-
-        # my services, uint64_t, 8b
-        services = Conversion.uint64_t(0)
-
-        # my unix epoch time, int64_t, 8b
-        timestamp = Conversion.int64_t(int(time.time()))
-
-        # host's services (assume 0x01), uint64_t, 8b
-        addr_recv_services = Conversion.uint64_t(1)
-
-        # host's addr IPv6 or IPv4 mapped IPv6 16b, char[16], big end
-        addr_recv_ip_addr = Conversion.ipv6_from_ipv4(BTC_HOST)
-
-        # host's port, uint16_t,big end, 2b
-        addr_recv_port = Conversion.uint16_t(BTC_PORT)
-
-        # addr_trans servs, same as services above, uint64_t, 8b
-        addr_trans_services = services
-
-        # my IPv6 or IPv4 mapped IPv6, char[16], big end, 16b
-        addr_trans_ip_addr = Conversion.ipv6_from_ipv4(CLI_HOST)
-
-        # my port, uint16_t, big end, 2b
-        addr_trans_port = Conversion.uint16_t(CLI_PORT)
-
-        # nonce, uint64_t, 8b
-        nonce = Conversion.uint64_t(0)
-
-        # compactSizeuint, user_agent_bytes -> 0, 4b
-        user_agent_bytes = Conversion.compactsize_t(0)
-
-        # start_height -> 0, int32_t, 4b
-        start_height = Conversion.int32_t(0)
-
-        # relay -> False
-        relay = Conversion.bool_t(False)
-
-        version_msg = version + services + timestamp + addr_recv_services + \
-                      addr_recv_ip_addr + addr_recv_port + addr_trans_services + \
-                      addr_trans_ip_addr + addr_trans_port + nonce + user_agent_bytes + \
-                      start_height + relay
-
-        return version_msg
-
-    @staticmethod
-    def make_block_header():
-        """ Returns block header
-
-        """
-        # block version, int32_t, 4b
-        block_version = Conversion.int32_t(4)
-        # prev block header, char[32], 32b
-        # prev_block_header_hash = self.double_sha256(''.encode())
-        # print('sys size', sys.getsizeof(prev_block_header_hash))
-        # prev_block_header_hash = self.double_sha256(bytearray(32))
-        prev_block_header_hash = BTC_HASH_BLOCK_ZERO
-
-        # merkle root hash, char[32], 32b
-        merkle_root_hash = prev_block_header_hash
-        # time, uint32_t, 4b
-        time = Conversion.uint32_t(TIME)
-        # nBits, uint32_t, 4b
-        nbits = Conversion.uint32_t(0)
-        # nonce, uint32_t, 4b
-        nonce = Conversion.uint32_t(0)
-
-        # print('block version', block_version)
-        print('prev block header hash', prev_block_header_hash)
-        # print('merkle_root_hash', merkle_root_hash)
-        # print('time', time)
-        # print('nbits', nbits, nbits.hex())
-        # print('nonce', nonce, nonce.hex())
-        block_header_hash = block_version + prev_block_header_hash + merkle_root_hash + time + nbits \
-                            + nonce
-        print('blockheaderhash', block_header_hash, sys.getsizeof(block_header_hash))
-        return block_header_hash
-
-    @staticmethod
-    def make_getblocks_msg():
-        """ Used to request an 'inv' msg from BTC node. Reference (6) for data sizes.
-        :returns: inv msg in bytes
-        """
-
-        version = Conversion.uint32_t(BTC_CORE_VERSION)
-        hashcount = Conversion.compactsize_t(1)
-        hdr_hashes = Conversion.swap_endianness(BTC_HASH_BLOCK_ZERO)
-        print('hdr_hashes', hdr_hashes)
-        stop_hash = bytearray(32)
-
-        return version + hashcount + hdr_hashes + stop_hash
+    """ PRINT ----------------------------------------------------------------------- """
 
     @staticmethod
     def print_msg(msg, text=''):
@@ -369,7 +378,7 @@ class Cli(object):
                                                              b[46:54], b[54:70], \
                                                              b[70:72]
         nonce = b[72:80]
-        user_agent_size, uasz = Conversion.unmarshal_compactsize(b[80:])
+        user_agent_size, uasz = Convert.unmarshal_compactsize(b[80:])
         i = 80 + len(user_agent_size)
         user_agent = b[i:i + uasz]
         i += uasz
@@ -382,28 +391,28 @@ class Cli(object):
         print(prefix + '-' * 56)
         prefix *= 2
         print('{}{:32} version {}'.format(prefix, version.hex(),
-                                          Conversion.unmarshal_int(version)))
+                                          Convert.unmarshal_int(version)))
         print('{}{:32} my services'.format(prefix, my_services.hex()))
         time_str = strftime("%a, %d %b %Y %H:%M:%S GMT",
-                            gmtime(Conversion.unmarshal_int(epoch_time)))
+                            gmtime(Convert.unmarshal_int(epoch_time)))
         print('{}{:32} epoch time {}'.format(prefix, epoch_time.hex(), time_str))
         print('{}{:32} your services'.format(prefix, your_services.hex()))
         print(
             '{}{:32} your host {}'.format(prefix, rec_host.hex(),
-                                          Conversion.ipv6_to_ipv4(rec_host)))
+                                          Convert.ipv6_to_ipv4(rec_host)))
         print('{}{:32} your port {}'.format(prefix, rec_port.hex(),
-                                            Conversion.unmarshal_uint(rec_port)))
+                                            Convert.unmarshal_uint(rec_port)))
         print('{}{:32} my services (again)'.format(prefix, my_services2.hex()))
         print('{}{:32} my host {}'.format(prefix, my_host.hex(),
-                                          Conversion.ipv6_to_ipv4(my_host)))
+                                          Convert.ipv6_to_ipv4(my_host)))
         print('{}{:32} my port {}'.format(prefix, my_port.hex(),
-                                          Conversion.unmarshal_uint(my_port)))
+                                          Convert.unmarshal_uint(my_port)))
         print('{}{:32} nonce'.format(prefix, nonce.hex()))
         print('{}{:32} user agent size {}'.format(prefix, user_agent_size.hex(), uasz))
         print('{}{:32} user agent \'{}\''.format(prefix, user_agent.hex(),
                                                  str(user_agent, encoding='utf-8')))
         print('{}{:32} start height {}'.format(prefix, start_height.hex(),
-                                               Conversion.unmarshal_uint(start_height)))
+                                               Convert.unmarshal_uint(start_height)))
         print('{}{:32} relay {}'.format(prefix, relay.hex(), bytes(relay) != b'\0'))
         if len(extra) > 0:
             print('{}{:32} EXTRA!!'.format(prefix, extra.hex()))
@@ -420,7 +429,7 @@ class Cli(object):
                                                                             16:20], header[
                                                                                     20:]
         command = str(bytearray([b for b in command_hex if b != 0]), encoding='utf-8')
-        psz = Conversion.unmarshal_uint(payload_size)
+        psz = Convert.unmarshal_uint(payload_size)
         if expected_cksum is None:
             verified = ''
         elif expected_cksum == cksum:
@@ -452,10 +461,10 @@ class Cli(object):
         print(padding + '-' * 56)
         padding *= 2
         print(
-            '{}{:32} version {}'.format(padding, version.hex(), Conversion.unmarshal_int(
+            '{}{:32} version {}'.format(padding, version.hex(), Convert.unmarshal_int(
                 version)))
         print('{}{:32} hashcount {}'.format(padding, count.hex(),
-                                            Conversion.unmarshal_compactsize(count)[1]))
+                                            Convert.unmarshal_compactsize(count)[1]))
         print('{}{:32} header hash'.format(padding, header_hash.hex()[:32]))
         print('{}{:32} stop hash'.format(padding, stop_hash.hex()[:32]))
 
@@ -474,7 +483,7 @@ if __name__ == '__main__':
     Cli.print_msg(version_hdr + version_msg, 'sending')
     s.sendall(version)
     header = s.recv(MSG_HDR_SZ)
-    payload_size = Conversion.unmarshal_uint(header[16:20])
+    payload_size = Convert.unmarshal_uint(header[16:20])
     payload = s.recv(payload_size)
     # response = self.message_node(version)
     Cli.print_msg(header + payload, 'received')
@@ -494,20 +503,20 @@ if __name__ == '__main__':
     Cli.print_msg(block, 'sending')
     s.sendall(block_msg)
     header = s.recv(MSG_HDR_SZ)
-    payload_size = Conversion.unmarshal_uint(header[16:20])
+    payload_size = Convert.unmarshal_uint(header[16:20])
     payload = s.recv(payload_size)
     Cli.print_msg(header + payload, 'received')
 
     Cli.print_msg(block, 'sending')
     s.sendall(block_msg)
     header = s.recv(MSG_HDR_SZ)
-    payload_size = Conversion.unmarshal_uint(header[16:20])
+    payload_size = Convert.unmarshal_uint(header[16:20])
     payload = s.recv(payload_size)
     Cli.print_msg(header + payload, 'received')
 
     Cli.print_msg(block, 'sending')
     s.sendall(block_msg)
     header = s.recv(MSG_HDR_SZ)
-    payload_size = Conversion.unmarshal_uint(header[16:20])
+    payload_size = Convert.unmarshal_uint(header[16:20])
     payload = s.recv(payload_size)
     Cli.print_msg(header + payload, 'received')
