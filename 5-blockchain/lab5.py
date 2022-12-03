@@ -196,65 +196,10 @@ class Conversion(object):
         return int.from_bytes(b, byteorder='little', signed=False)
 
 
-class Client(object):
+class Cli(object):
 
-    def __init__(self, block_num):
-        self.block_num = block_num % 10000
-
-    def run_cli(self):
-        """
-
-        """
-
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.connect((BTC_HOST, BTC_PORT))
-
-        # version
-        version_msg = self.make_version_msg()
-        version_hdr = self.make_msg_header('version', version_msg)
-        version = version_hdr + version_msg
-        self.print_msg(version_hdr + version_msg, 'sending')
-        s.sendall(version)
-        header = s.recv(MSG_HDR_SZ)
-        payload_size = Conversion.unmarshal_uint(header[16:20])
-        payload = s.recv(payload_size)
-        # response = self.message_node(version)
-        self.print_msg(header + payload, 'received')
-
-        # verack (hdr only)
-        verack = self.make_msg_header('verack')
-        self.print_msg(verack, 'sending')
-        s.sendall(verack)
-        header = s.recv(MSG_HDR_SZ)
-        # response = self.message_node(verack)
-        self.print_msg(header, 'received')
-
-        # # block
-        block_msg = self.make_getblocks_msg()
-        block_hdr = self.make_msg_header('getblocks', block_msg)
-        block = block_hdr + block_msg
-        self.print_msg(block, 'sending')
-        s.sendall(block_msg)
-        header = s.recv(MSG_HDR_SZ)
-        payload_size = Conversion.unmarshal_uint(header[16:20])
-        payload = s.recv(payload_size)
-        self.print_msg(header + payload, 'received')
-
-        self.print_msg(block, 'sending')
-        s.sendall(block_msg)
-        header = s.recv(MSG_HDR_SZ)
-        payload_size = Conversion.unmarshal_uint(header[16:20])
-        payload = s.recv(payload_size)
-        self.print_msg(header + payload, 'received')
-
-        self.print_msg(block, 'sending')
-        s.sendall(block_msg)
-        header = s.recv(MSG_HDR_SZ)
-        payload_size = Conversion.unmarshal_uint(header[16:20])
-        payload = s.recv(payload_size)
-        self.print_msg(header + payload, 'received')
-
-    def make_msg_header(self, command, payload=None):
+    @staticmethod
+    def make_msg_header(command, payload=None):
         """ Determines header params and converts to bytes. Returns
         byte str of header information.
         :param command: bitcoin command to send to node
@@ -274,11 +219,12 @@ class Client(object):
         if payload is None:
             payload = ''.encode()
         payload_size_bytes = Conversion.uint32_t(len(payload))
-        checksum = self.checksum(payload)
+        checksum = Cli.checksum(payload)
         header = start_string + command + payload_size_bytes + checksum
         return header
 
-    def checksum(self, b):
+    @staticmethod
+    def checksum(b):
         """ Hashes byte object twice with SHA-256, returns last 4 digits
         :param b: byte object to be double hashed
         :returns: hashed(b)[0:4]
@@ -287,7 +233,8 @@ class Client(object):
         second_hash = hashlib.sha256(first_hash).digest()
         return second_hash[0:4]
 
-    def double_sha256(self, b):
+    @staticmethod
+    def double_sha256(b):
         """ Hashes byte object twice with SHA-256, returns hash
         :param b: byte object to be double hashed
         :returns: hashed(b)
@@ -296,7 +243,8 @@ class Client(object):
         second_hash = hashlib.sha256(first_hash).digest()
         return second_hash
 
-    def make_version_msg(self):
+    @staticmethod
+    def make_version_msg():
         """
         Creates the version msg that will be sent to the bitcoin node. Recipe for version
         message from reference (1). Reference (3) for byte conversations and
@@ -349,7 +297,8 @@ class Client(object):
 
         return version_msg
 
-    def make_block_header(self):
+    @staticmethod
+    def make_block_header():
         """ Returns block header
 
         """
@@ -381,7 +330,8 @@ class Client(object):
         print('blockheaderhash', block_header_hash, sys.getsizeof(block_header_hash))
         return block_header_hash
 
-    def make_getblocks_msg(self):
+    @staticmethod
+    def make_getblocks_msg():
         """ Used to request an 'inv' msg from BTC node. Reference (6) for data sizes.
         :returns: inv msg in bytes
         """
@@ -394,16 +344,17 @@ class Client(object):
 
         return version + hashcount + hdr_hashes + stop_hash
 
-    def print_msg(self, msg, text=''):
+    @staticmethod
+    def print_msg(msg, text=''):
         print('\n{}MESSAGE'.format('' if text is None else (text + ' ')))
         print('({}) {}'.format(len(msg), msg[:60].hex() + ('' if len(msg) < 60 else
                                                            '...')))
         payload = msg[MSG_HDR_SZ:]
-        command = self.print_header(msg[:MSG_HDR_SZ], self.checksum(payload))
+        command = Cli.print_header(msg[:MSG_HDR_SZ], Cli.checksum(payload))
         if command == 'version':
-            self.print_version_msg(payload)
+            Cli.print_version_msg(payload)
         elif command == 'getblocks':
-            self.print_getblocks(payload)
+            Cli.print_getblocks(payload)
 
     @staticmethod
     def print_version_msg(b):
@@ -457,7 +408,8 @@ class Client(object):
         if len(extra) > 0:
             print('{}{:32} EXTRA!!'.format(prefix, extra.hex()))
 
-    def print_header(self, header, expected_cksum=None):
+    @staticmethod
+    def print_header(header, expected_cksum=None):
         """
         Report the contents of the given bitcoin message header
         :param header: bitcoin message header (bytes or bytearray)
@@ -485,7 +437,8 @@ class Client(object):
         print('{}{:32} checksum {}'.format(prefix, cksum.hex(), verified))
         return command
 
-    def print_getblocks(self, b):
+    @staticmethod
+    def print_getblocks(b):
         """
         :param b: get_blocks msg in bytes
         """
@@ -510,6 +463,51 @@ class Client(object):
 if __name__ == '__main__':
     print('Running client')
     # init client
-    my_block = 1697482
-    cli = Client(my_block)
-    cli.run_cli()
+    my_block = 1697482 % 10000
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.connect((BTC_HOST, BTC_PORT))
+
+    # version
+    version_msg = Cli.make_version_msg()
+    version_hdr = Cli.make_msg_header('version', version_msg)
+    version = version_hdr + version_msg
+    Cli.print_msg(version_hdr + version_msg, 'sending')
+    s.sendall(version)
+    header = s.recv(MSG_HDR_SZ)
+    payload_size = Conversion.unmarshal_uint(header[16:20])
+    payload = s.recv(payload_size)
+    # response = self.message_node(version)
+    Cli.print_msg(header + payload, 'received')
+
+    # verack (hdr only)
+    verack = Cli.make_msg_header('verack')
+    Cli.print_msg(verack, 'sending')
+    s.sendall(verack)
+    header = s.recv(MSG_HDR_SZ)
+    # response = self.message_node(verack)
+    Cli.print_msg(header, 'received')
+
+    # # block
+    block_msg = Cli.make_getblocks_msg()
+    block_hdr = Cli.make_msg_header('getblocks', block_msg)
+    block = block_hdr + block_msg
+    Cli.print_msg(block, 'sending')
+    s.sendall(block_msg)
+    header = s.recv(MSG_HDR_SZ)
+    payload_size = Conversion.unmarshal_uint(header[16:20])
+    payload = s.recv(payload_size)
+    Cli.print_msg(header + payload, 'received')
+
+    Cli.print_msg(block, 'sending')
+    s.sendall(block_msg)
+    header = s.recv(MSG_HDR_SZ)
+    payload_size = Conversion.unmarshal_uint(header[16:20])
+    payload = s.recv(payload_size)
+    Cli.print_msg(header + payload, 'received')
+
+    Cli.print_msg(block, 'sending')
+    s.sendall(block_msg)
+    header = s.recv(MSG_HDR_SZ)
+    payload_size = Conversion.unmarshal_uint(header[16:20])
+    payload = s.recv(payload_size)
+    Cli.print_msg(header + payload, 'received')
