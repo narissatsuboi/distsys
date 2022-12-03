@@ -33,10 +33,11 @@ from time import strftime, gmtime
 CLI_HOST, CLI_PORT = '127.0.0.1', 59550  # requestor addr
 BTC_HOST, BTC_PORT = '95.214.53.160', 8333  # sync node addr
 CLI_ADDR, BTC_ADDR = (CLI_HOST, CLI_PORT), (BTC_HOST, BTC_PORT)
-MAX_BUF_SZ = 2_000_000  # b
+MAX_BUF_SZ = 100000  # b
 
 # btc protocol globals
 MSG_HDR_SZ = 24  # b
+HDR_START, HDR_END = 16, 20
 BTC_CORE_VERSION = 70015
 MAINNET = 'f9beb4d9'
 TIME = int(time.time())
@@ -372,6 +373,47 @@ class Cli(object):
         second_hash = hashlib.sha256(first_hash).digest()
         return second_hash
 
+    @staticmethod
+    def parse_bytes_recv(b):
+        """
+        Parses byte stream and separates byte messages. Returns list of byte messages.
+        :param b: bytes or bytearray
+        :return: list of bytearrays
+        """
+
+        msgs_recv = []
+        while len(b) > 0:
+            # get the size of this payload from header
+            payload_sz = Convert.unmarshal_uint(b[HDR_START:HDR_END])
+            msg_len = payload_sz + MSG_HDR_SZ
+            # grab the bytes from start to msg_len
+            msg = b[:msg_len]
+            msgs_recv.append(msg)
+            b = b[msg_len:]
+
+        return msgs_recv
+
+    """ NETWORKING ------------------------------------------------------------------ """
+
+    @staticmethod
+    def send_and_receive_bytes(socket, b):
+        """
+        Sends bytes on given socket, recieves bytestream response and returns it.
+        :param socket: socket connected to host
+        :param b: bytes or byte array to send
+        """
+        # TODO expected bytes?
+        recv_bytes = bytearray()
+        socket.settimeout(1)
+        try:
+            socket.sendall(b)
+            while True:
+                recv_bytes += socket.recv(MAX_BUF_SZ)
+        except Exception as err:
+            print(err)
+
+        return recv_bytes
+
     """ PRINT ----------------------------------------------------------------------- """
 
     @staticmethod
@@ -491,51 +533,47 @@ class Cli(object):
 
 
 if __name__ == '__main__':
-    print('Running client')
     # init client
     my_block = 1697482 % 10000
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.connect((BTC_HOST, BTC_PORT))
 
-    # version
+    # send version, recv version and verack
     version = Cli.make_package(VERSION)
     Cli.print_msg(version, 'sending')
-    s.sendall(version)
-    header = s.recv(MSG_HDR_SZ)
-    payload_size = Convert.unmarshal_uint(header[16:20])
-    payload = s.recv(payload_size)
-    # response = self.message_node(version)
-    Cli.print_msg(header + payload, 'received')
+    msgs = Cli.parse_bytes_recv(Cli.send_and_receive_bytes(s, version))
+    for msg in msgs:
+        Cli.print_msg(msg, 'received')
 
     # verack (hdr only)
-    verack = Cli.make_msg_header('verack')
+    verack = Cli.make_package(VERACK)
     Cli.print_msg(verack, 'sending')
-    s.sendall(verack)
-    header = s.recv(MSG_HDR_SZ)
-    # response = self.message_node(verack)
-    Cli.print_msg(header, 'received')
+    # will include sendheaders, sendcmpctx2, ping, feefilter
+    msgs = Cli.parse_bytes_recv(Cli.send_and_receive_bytes(s, verack))
+    for msg in msgs:
+        Cli.print_msg(msg, 'received')
 
-    # # block
-    block_msg = Cli.make_getblocks_msg()
-    block_hdr = Cli.make_msg_header('getblocks', block_msg)
-    block = block_hdr + block_msg
-    Cli.print_msg(block, 'sending')
-    s.sendall(block_msg)
-    header = s.recv(MSG_HDR_SZ)
-    payload_size = Convert.unmarshal_uint(header[16:20])
-    payload = s.recv(payload_size)
-    Cli.print_msg(header + payload, 'received')
-
-    Cli.print_msg(block, 'sending')
-    s.sendall(block_msg)
-    header = s.recv(MSG_HDR_SZ)
-    payload_size = Convert.unmarshal_uint(header[16:20])
-    payload = s.recv(payload_size)
-    Cli.print_msg(header + payload, 'received')
-
-    Cli.print_msg(block, 'sending')
-    s.sendall(block_msg)
-    header = s.recv(MSG_HDR_SZ)
-    payload_size = Convert.unmarshal_uint(header[16:20])
-    payload = s.recv(payload_size)
-    Cli.print_msg(header + payload, 'received')
+    # # # block
+    # block_msg = Cli.make_getblocks_msg()
+    # block_hdr = Cli.make_msg_header('getblocks', block_msg)
+    # block = block_hdr + block_msg
+    # Cli.print_msg(block, 'sending')
+    # s.sendall(block_msg)
+    # header = s.recv(MSG_HDR_SZ)
+    # payload_size = Convert.unmarshal_uint(header[16:20])
+    # payload = s.recv(payload_size)
+    # Cli.print_msg(header + payload, 'received')
+    #
+    # Cli.print_msg(block, 'sending')
+    # s.sendall(block_msg)
+    # header = s.recv(MSG_HDR_SZ)
+    # payload_size = Convert.unmarshal_uint(header[16:20])
+    # payload = s.recv(payload_size)
+    # Cli.print_msg(header + payload, 'received')
+    #
+    # Cli.print_msg(block, 'sending')
+    # s.sendall(block_msg)
+    # header = s.recv(MSG_HDR_SZ)
+    # payload_size = Convert.unmarshal_uint(header[16:20])
+    # payload = s.recv(payload_size)
+    # Cli.print_msg(header + payload, 'received')
