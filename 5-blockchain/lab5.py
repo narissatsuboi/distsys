@@ -85,7 +85,7 @@ class Convert(object):
         """
         Converts a compact uint to an uint.
         :param b: bytes or bytearray
-        :return: uint
+        :return: size of bytes, uint
         """
         key = b[0]
         if key == 0xff:
@@ -346,10 +346,24 @@ class Cli(object):
         version = Convert.uint32_t(BTC_CORE_VERSION)
         hashcount = Convert.compactsize_t(1)
         hdr_hashes = Convert.swap_endianness(BTC_HASH_BLOCK_ZERO)
-        print('hdr_hashes', hdr_hashes)
         stop_hash = bytearray(32)
 
         return version + hashcount + hdr_hashes + stop_hash
+
+    @staticmethod
+    def parse_inv_bytes_to_hash(b):
+        """Expects bytes from inventory message less header with 500 block hashes"""
+        hashes = []  # holds hashes collected from b in bytes
+
+        # parse hashes, skip count in bytes (offset)
+        print('b', b)
+        count_invs_b, count_inv_int = Convert.unmarshal_compactsize(b)
+        offset = len(count_invs_b)
+        hash_start, hash_end, hash_len = 4, 36, 32
+        for i in range(count_inv_int):
+            hashes.append(b[offset + hash_start: offset + hash_end])
+            offset += hash_end
+        return hashes
 
     """ UTILS ----------------------------------------------------------------------- """
 
@@ -402,7 +416,6 @@ class Cli(object):
         :param socket: socket connected to host
         :param b: bytes or byte array to send
         """
-        # TODO expected bytes?
         recv_bytes = bytearray()
         socket.settimeout(1)
         try:
@@ -417,7 +430,7 @@ class Cli(object):
     """ PRINT ----------------------------------------------------------------------- """
 
     @staticmethod
-    def print_msg(msg, text=''):
+    def print_msg(msg, text='', start=1, end=500):
         print('\n{}MESSAGE'.format('' if text is None else (text + ' ')))
         print('({}) {}'.format(len(msg), msg[:60].hex() + ('' if len(msg) < 60 else
                                                            '...')))
@@ -427,6 +440,8 @@ class Cli(object):
             Cli.print_version_msg(payload)
         elif command == 'getblocks':
             Cli.print_getblocks(payload)
+        elif command == 'inv':
+            return Cli.print_inv_msg(payload, start, end)
 
     @staticmethod
     def print_version_msg(b):
@@ -531,10 +546,32 @@ class Cli(object):
         print('{}{:32} header hash'.format(padding, header_hash.hex()[:32]))
         print('{}{:32} stop hash'.format(padding, stop_hash.hex()[:32]))
 
+    @staticmethod
+    def print_inv_msg(b, start=0, end=500):
+        """ """
+
+        hashes = Cli.parse_inv_bytes_to_hash(b)
+
+        # parse hashes, skip count in bytes (offset)
+        count_b, count = Convert.unmarshal_compactsize(b)
+        hash_len = 32
+        padding = '  '
+        print('{}{}{}{}'.format(padding, 'INV - requested ', count, ' inventories'))
+        print(padding + '-' * 56)
+        padding *= 2
+        for hash in hashes:
+            hash_hex = Convert.swap_endianness(hash).hex()
+            row_1, row_2 = hash_hex[:hash_len], hash_hex[hash_len:]
+            start += 1
+            print(
+                '{}{}\n{}{} block {} / {}'.format(padding, row_1, padding, row_2, start,
+                                                  end))
+        return hashes
+
 
 if __name__ == '__main__':
     # init client
-    my_block = 1697482 % 10000
+    my_block = 1697482 % 10000  # 7482
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.connect((BTC_HOST, BTC_PORT))
 
@@ -545,7 +582,7 @@ if __name__ == '__main__':
     for msg in msgs:
         Cli.print_msg(msg, 'received')
 
-    # verack (hdr only)
+    # send verack (hdr only)
     verack = Cli.make_package(VERACK)
     Cli.print_msg(verack, 'sending')
     # will include sendheaders, sendcmpctx2, ping, feefilter
@@ -553,27 +590,19 @@ if __name__ == '__main__':
     for msg in msgs:
         Cli.print_msg(msg, 'received')
 
-    # # # block
-    # block_msg = Cli.make_getblocks_msg()
-    # block_hdr = Cli.make_msg_header('getblocks', block_msg)
-    # block = block_hdr + block_msg
-    # Cli.print_msg(block, 'sending')
-    # s.sendall(block_msg)
-    # header = s.recv(MSG_HDR_SZ)
-    # payload_size = Convert.unmarshal_uint(header[16:20])
-    # payload = s.recv(payload_size)
-    # Cli.print_msg(header + payload, 'received')
-    #
-    # Cli.print_msg(block, 'sending')
-    # s.sendall(block_msg)
-    # header = s.recv(MSG_HDR_SZ)
-    # payload_size = Convert.unmarshal_uint(header[16:20])
-    # payload = s.recv(payload_size)
-    # Cli.print_msg(header + payload, 'received')
-    #
-    # Cli.print_msg(block, 'sending')
-    # s.sendall(block_msg)
-    # header = s.recv(MSG_HDR_SZ)
-    # payload_size = Convert.unmarshal_uint(header[16:20])
-    # payload = s.recv(payload_size)
-    # Cli.print_msg(header + payload, 'received')
+    # send getblocks get inv
+    # keep searching for block num until found
+    hashes = []
+    blocks_seen, block_total = 0, 500
+    while blocks_seen <= my_block:
+        getblocks = Cli.make_package(GETBLOCKS)
+        Cli.print_msg(getblocks, 'sending')
+        msgs = Cli.parse_bytes_recv(Cli.send_and_receive_bytes(s, getblocks))
+        for msg in msgs:
+            hashes = Cli.print_msg(msg, 'received', blocks_seen, block_total)
+        blocks_seen = block_total
+        block_total += 500
+
+    # retrive the hash
+    my_block_hash = hashes[(my_block % 500)-1]
+    print(Convert.swap_endianness(my_block_hash).hex())
