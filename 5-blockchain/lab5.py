@@ -40,6 +40,7 @@ MSG_HDR_SZ = 24  # b
 BTC_CORE_VERSION = 70015
 MAINNET = 'f9beb4d9'
 TIME = int(time.time())
+VERSION, VERACK, GETBLOCKS = 'version', 'verack', 'getblocks'
 
 # block 0 globals
 BTC_HASH_BLOCK_ZERO = bytes.fromhex(
@@ -202,6 +203,26 @@ class Cli(object):
     """
 
     """ MAKE HEADER OR MESSAGE ------------------------------------------------------ """
+
+    @staticmethod
+    def make_package(command):
+        """
+        Forms a header and message (if required) based off of the command. Combines
+        into byte array.
+        :param command: a btc protocol command ie 'version'
+        :return: bytes or byte array representing header and message
+        """
+        msg = ''
+        if command == VERSION or command == GETBLOCKS:
+            if command == VERSION:
+                msg = Cli.make_version_msg()
+            elif command == GETBLOCKS:
+                msg = Cli.make_getblocks_msg()
+            hdr = Cli.make_msg_header(command, msg)
+            return hdr + msg
+        elif command == VERACK:
+            hdr = Cli.make_msg_header(command)
+            return hdr
 
     @staticmethod
     def make_msg_header(command, payload=None):
@@ -477,10 +498,8 @@ if __name__ == '__main__':
     s.connect((BTC_HOST, BTC_PORT))
 
     # version
-    version_msg = Cli.make_version_msg()
-    version_hdr = Cli.make_msg_header('version', version_msg)
-    version = version_hdr + version_msg
-    Cli.print_msg(version_hdr + version_msg, 'sending')
+    version = Cli.make_package(VERSION)
+    Cli.print_msg(version, 'sending')
     s.sendall(version)
     header = s.recv(MSG_HDR_SZ)
     payload_size = Convert.unmarshal_uint(header[16:20])
